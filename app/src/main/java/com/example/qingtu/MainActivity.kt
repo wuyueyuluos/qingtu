@@ -3,6 +3,7 @@ package com.example.qingtu
 import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import java.io.ByteArrayOutputStream
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -157,6 +158,7 @@ private fun CompressionPage(onBack: () -> Unit) {
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     var originalBytes by remember { mutableLongStateOf(0L) }
+    var compressedBytes by remember { mutableLongStateOf(0L) }
     var quality by remember { mutableFloatStateOf(75f) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("选择一张图片，开始压缩。") }
@@ -164,6 +166,7 @@ private fun CompressionPage(onBack: () -> Unit) {
         if (uri != null) {
             selectedUri = uri
             bitmap = null
+            compressedBytes = 0L
             message = "正在读取图片…"
             scope.launch {
                 val loaded = withContext(Dispatchers.IO) {
@@ -214,6 +217,17 @@ private fun CompressionPage(onBack: () -> Unit) {
         if (originalBytes > 0) {
             Text("原始大小：${formatBytes(originalBytes)}", color = DeepGreen, modifier = Modifier.padding(top = 8.dp))
         }
+        if (compressedBytes > 0) {
+            val savedPercent = if (originalBytes > 0) {
+                ((originalBytes - compressedBytes).toDouble() / originalBytes * 100).toInt()
+            } else 0
+            Text("压缩后：${formatBytes(compressedBytes)}", color = DeepGreen,
+                fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+            Text(
+                if (savedPercent >= 0) "体积减少 $savedPercent%" else "文件增大了 ${-savedPercent}%",
+                color = Muted, fontSize = 12.sp
+            )
+        }
         Text(message, fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 8.dp))
         Spacer(Modifier.height(8.dp))
         Button(
@@ -225,6 +239,11 @@ private fun CompressionPage(onBack: () -> Unit) {
                     scope.launch {
                         val result = withContext(Dispatchers.IO) {
                             try {
+                                val buffer = ByteArrayOutputStream()
+                                if (!source.compress(Bitmap.CompressFormat.JPEG, quality.toInt(), buffer)) {
+                                    error("图片压缩失败")
+                                }
+                                val imageBytes = buffer.toByteArray()
                                 val values = ContentValues().apply {
                                     put(MediaStore.Images.Media.DISPLAY_NAME, "轻图_${System.currentTimeMillis()}.jpg")
                                     put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
@@ -235,20 +254,19 @@ private fun CompressionPage(onBack: () -> Unit) {
                                     ?: error("无法创建保存文件")
                                 try {
                                     resolver.openOutputStream(output)?.use { stream ->
-                                        if (!source.compress(Bitmap.CompressFormat.JPEG, quality.toInt(), stream)) {
-                                            error("图片压缩失败")
-                                        }
+                                        stream.write(imageBytes)
                                     } ?: error("无法写入文件")
-                                    "已保存到 Pictures/轻图/"
+                                    Pair("已保存到 Pictures/轻图/", imageBytes.size.toLong())
                                 } catch (e: Exception) {
                                     resolver.delete(output, null, null)
                                     throw e
                                 }
                             } catch (e: Exception) {
-                                "保存失败：${e.message ?: "未知错误"}"
+                                Pair("保存失败：${e.message ?: "未知错误"}", 0L)
                             }
                         }
-                        message = result
+                        message = result.first
+                        compressedBytes = result.second
                         busy = false
                     }
                 }
