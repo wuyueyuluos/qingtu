@@ -207,6 +207,7 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
                             try {
                                 val input = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
                                     ?: error("无法读取图片")
+                                val inputBytes = context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
                                 val currentMode = mode
                                 val currentFormat = format
                                 val currentQuality = quality.toInt()
@@ -251,8 +252,12 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
                                 }
                                 val resolver = context.contentResolver
                                 val out = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: error("无法创建文件")
-                                try { resolver.openOutputStream(out)?.use { it.write(buffer.toByteArray()) } ?: error("写入失败") }
+                                val outputBytes = buffer.toByteArray()
+                                try { resolver.openOutputStream(out)?.use { it.write(outputBytes) } ?: error("写入失败") }
                                 catch (e: Exception) { resolver.delete(out, null, null); throw e }
+                                val action = when (currentMode) { "压缩" -> "批量压缩"; "格式转换" -> "批量格式转换"; else -> "批量调整尺寸" }
+                                val detail = when (currentMode) { "格式转换" -> "转为 $currentFormat"; "调整尺寸" -> "${currentScale.toInt()}%"; else -> "质量 ${currentQuality}%" }
+                                ProcessingHistory.add(context, action, uri, out, inputBytes, outputBytes.size.toLong(), detail)
                                 success++
                             } catch (e: Exception) { errors.add("${index + 1}号图片：${e.message ?: "处理失败"}") }
                         }
