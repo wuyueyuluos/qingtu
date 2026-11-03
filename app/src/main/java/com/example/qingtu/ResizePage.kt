@@ -44,6 +44,7 @@ internal fun ResizePage(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var sourceUri by remember { mutableStateOf<Uri?>(null) }
     var originalBytes by remember { mutableLongStateOf(0L) }
     var sourceMime by remember { mutableStateOf("image/jpeg") }
     var widthText by remember { mutableStateOf("") }
@@ -63,6 +64,7 @@ internal fun ResizePage(onBack: () -> Unit) {
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
+            sourceUri = uri
             sourceMime = context.contentResolver.getType(uri) ?: "image/jpeg"
             bitmap = null
             originalBytes = 0L
@@ -178,6 +180,7 @@ internal fun ResizePage(onBack: () -> Unit) {
                             val output = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: error("无法创建保存文件")
                             try {
                                 resolver.openOutputStream(output)?.use { it.write(bytes) } ?: error("无法写入文件")
+                                ProcessingHistory.add(context, "调整尺寸", sourceUri, output, originalBytes, bytes.size.toLong(), "${w} × ${h} px")
                                 Pair("已保存到 Pictures/轻图/，文件大小：${resizeBytes(bytes.size.toLong())}", true)
                             } catch (e: Exception) {
                                 resolver.delete(output, null, null)
