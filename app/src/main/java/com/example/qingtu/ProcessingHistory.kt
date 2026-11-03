@@ -1,6 +1,7 @@
 package com.example.qingtu
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import org.json.JSONArray
@@ -22,7 +23,7 @@ import androidx.compose.runtime.setValue
 internal data class ProcessingRecord(
     val id: Long, val time: Long, val action: String,
     val sourceName: String, val outputName: String,
-    val sourceBytes: Long, val outputBytes: Long, val details: String
+    val sourceBytes: Long, val outputBytes: Long, val details: String, val outputUri: String
 )
 
 internal object ProcessingHistory {
@@ -36,7 +37,7 @@ internal object ProcessingHistory {
             val o = array.optJSONObject(i) ?: return@mapNotNull null
             ProcessingRecord(o.optLong("id"), o.optLong("time"), o.optString("action"),
                 o.optString("source"), o.optString("output"), o.optLong("before"),
-                o.optLong("after"), o.optString("details"))
+                o.optLong("after"), o.optString("details"), o.optString("outputUri"))
         }.sortedByDescending { it.time }
     }
 
@@ -46,17 +47,35 @@ internal object ProcessingHistory {
         val outputName = displayName(context, outputUri) ?: "处理后的图片"
         val records = all(context).toMutableList()
         records.add(0, ProcessingRecord(System.currentTimeMillis(), System.currentTimeMillis(),
-            action, sourceName, outputName, sourceBytes, outputBytes, details))
+            action, sourceName, outputName, sourceBytes, outputBytes, details, outputUri.toString()))
         val array = JSONArray()
         records.take(300).forEach { r ->
             array.put(JSONObject().put("id", r.id).put("time", r.time).put("action", r.action)
                 .put("source", r.sourceName).put("output", r.outputName)
-                .put("before", r.sourceBytes).put("after", r.outputBytes).put("details", r.details))
+                .put("before", r.sourceBytes).put("after", r.outputBytes).put("details", r.details).put("outputUri", r.outputUri))
+        }
+        prefs(context).edit().putString(KEY, array.toString()).apply()
+    }
+
+    fun delete(context: Context, id: Long) {
+        val array = JSONArray()
+        all(context).filter { it.id != id }.forEach { r ->
+            array.put(JSONObject().put("id", r.id).put("time", r.time).put("action", r.action)
+                .put("source", r.sourceName).put("output", r.outputName)
+                .put("before", r.sourceBytes).put("after", r.outputBytes)
+                .put("details", r.details).put("outputUri", r.outputUri))
         }
         prefs(context).edit().putString(KEY, array.toString()).apply()
     }
 
     fun clear(context: Context) { prefs(context).edit().remove(KEY).apply() }
+
+    fun openOutput(context: Context, record: ProcessingRecord) {
+        val uri = Uri.parse(record.outputUri)
+        val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "image/*")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        try { context.startActivity(intent) } catch (_: Exception) { }
+    }
 
     private fun displayName(context: Context, uri: Uri?): String? {
         if (uri == null) return null
@@ -79,7 +98,7 @@ internal object ProcessingHistory {
 internal fun ProcessingHistoryPage() {
     val context = androidx.compose.ui.platform.LocalContext.current
     var records by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(ProcessingHistory.all(context)) }
-    var confirmClear by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var confirmClear by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }\n    var pendingDelete by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<ProcessingRecord?>(null) }
     androidx.compose.foundation.layout.Column(
         modifier = androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFFF6F7F3)).padding(horizontal = 20.dp)
     ) {
@@ -106,6 +125,17 @@ internal fun ProcessingHistoryPage() {
                             }
                             androidx.compose.material3.Text(r.sourceName, color = androidx.compose.ui.graphics.Color(0xFF26332C), fontSize = 13.sp, modifier = androidx.compose.ui.Modifier.padding(top = 8.dp))
                             androidx.compose.material3.Text("输出：${r.outputName}", color = androidx.compose.ui.graphics.Color(0xFF647168), fontSize = 12.sp, modifier = androidx.compose.ui.Modifier.padding(top = 3.dp))
+                            androidx.compose.foundation.layout.Row(
+                                modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(top = 6.dp),
+                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
+                            ) {
+                                androidx.compose.material3.TextButton(onClick = { ProcessingHistory.openOutput(context, r) }) {
+                                    androidx.compose.material3.Text("查看图片")
+                                }
+                                androidx.compose.material3.TextButton(onClick = { pendingDelete = r }) {
+                                    androidx.compose.material3.Text("删除记录", color = androidx.compose.ui.graphics.Color(0xFF9A625B))
+                                }
+                            }
                             androidx.compose.material3.Text("${ProcessingHistory.size(r.sourceBytes)} → ${ProcessingHistory.size(r.outputBytes)}" + if (r.details.isNotBlank()) " · ${r.details}" else "", color = androidx.compose.ui.graphics.Color(0xFF89938B), fontSize = 11.sp, modifier = androidx.compose.ui.Modifier.padding(top = 7.dp))
                         }
                     }
@@ -113,6 +143,17 @@ internal fun ProcessingHistoryPage() {
             }
         }
     }
+    if (pendingDelete != null) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { pendingDelete = null },
+        title = { androidx.compose.material3.Text("删除这条记录？") },
+        text = { androidx.compose.material3.Text("只删除记录，不会删除输出图片。") },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = {
+            ProcessingHistory.delete(context, pendingDelete!!.id)
+            records = ProcessingHistory.all(context)
+            pendingDelete = null
+        }) { androidx.compose.material3.Text("删除") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = { pendingDelete = null }) { androidx.compose.material3.Text("取消") } }
+    )
     if (confirmClear) androidx.compose.material3.AlertDialog(
         onDismissRequest = { confirmClear = false },
         title = { androidx.compose.material3.Text("清空处理记录？") },
