@@ -45,6 +45,7 @@ internal fun ResizePage(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     var originalBytes by remember { mutableLongStateOf(0L) }
+    var sourceMime by remember { mutableStateOf("image/jpeg") }
     var widthText by remember { mutableStateOf("") }
     var heightText by remember { mutableStateOf("") }
     var keepRatio by remember { mutableStateOf(true) }
@@ -63,6 +64,7 @@ internal fun ResizePage(onBack: () -> Unit) {
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
+            sourceMime = context.contentResolver.getType(uri) ?: "image/jpeg"
             bitmap = null
             originalBytes = 0L
             savedSize = ""
@@ -158,7 +160,7 @@ internal fun ResizePage(onBack: () -> Unit) {
                     val result = withContext(Dispatchers.IO) {
                         try {
                             val resized = Bitmap.createScaledBitmap(input, w, h, true)
-                            val mime = if (resized.hasAlpha()) "image/png" else (context.contentResolver.getType(uriForMimePlaceholder()) ?: "image/jpeg")
+                            val mime = if (resized.hasAlpha()) "image/png" else sourceMime
                             val format = when {
                                 mime == "image/png" -> Bitmap.CompressFormat.PNG
                                 mime == "image/webp" -> Bitmap.CompressFormat.WEBP
