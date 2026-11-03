@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,6 +66,15 @@ fun QingTuApp() {
     var showConverter by remember { mutableStateOf(false) }
     var showResizer by remember { mutableStateOf(false) }
     var showBatch by remember { mutableStateOf(false) }
+    BackHandler(enabled = showCompressor || showConverter || showResizer || showBatch || selectedTab != 0) {
+        when {
+            showCompressor -> showCompressor = false
+            showConverter -> showConverter = false
+            showResizer -> showResizer = false
+            showBatch -> showBatch = false
+            selectedTab != 0 -> selectedTab = 0
+        }
+    }
     QingTuTheme(darkTheme = darkTheme) {
         if (showCompressor) {
             CompressionPage(onBack = { showCompressor = false })
