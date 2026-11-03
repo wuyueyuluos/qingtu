@@ -90,7 +90,7 @@ fun QingTuApp() {
             ) { padding ->
                 when (selectedTab) {
                     0 -> HomePage(Modifier.padding(padding), onCompress = { showCompressor = true }, onConvert = { showConverter = true }, onResize = { showResizer = true }, onBatch = { showBatch = true })
-                    1 -> EmptyPage("处理记录", "完成的图片会保存在这里。")
+                    1 -> ProcessingHistoryPage()
                     else -> EmptyPage("设置", "默认保存位置、图片信息与外观设置将在这里提供。")
                 }
             }
