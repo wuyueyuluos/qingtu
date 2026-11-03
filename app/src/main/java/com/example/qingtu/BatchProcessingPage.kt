@@ -47,7 +47,7 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
     var scale by remember { mutableFloatStateOf(80f) }
     var busy by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf("") }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { selected ->
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { selected ->
         if (selected.isNotEmpty()) {
             images = selected
             result = "已选择 ${selected.size} 张图片。"
@@ -60,7 +60,7 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
             Text("批量处理", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = BatchInk)
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = { picker.launch("image/*") }, modifier = Modifier.fillMaxWidth(), enabled = !busy) {
+        OutlinedButton(onClick = { picker.launch(arrayOf("image/*")) }, modifier = Modifier.fillMaxWidth(), enabled = !busy) {
             Icon(Icons.Rounded.AddPhotoAlternate, null)
             Spacer(Modifier.width(8.dp))
             Text(if (images.isEmpty()) "选择多张图片" else "重新选择图片（当前 ${images.size} 张）")
