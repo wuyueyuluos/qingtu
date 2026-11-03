@@ -265,6 +265,7 @@ private fun CompressionPage(onBack: () -> Unit) {
                                     resolver.openOutputStream(output)?.use { stream ->
                                         stream.write(imageBytes)
                                     } ?: error("无法写入文件")
+                                    ProcessingHistory.add(context, "图片压缩", selectedUri, output, originalBytes, imageBytes.size.toLong(), "质量 ${quality.toInt()}%")
                                     Pair("已保存到 Pictures/轻图/", imageBytes.size.toLong())
                                 } catch (e: Exception) {
                                     resolver.delete(output, null, null)
