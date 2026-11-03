@@ -98,7 +98,8 @@ internal object ProcessingHistory {
 internal fun ProcessingHistoryPage() {
     val context = androidx.compose.ui.platform.LocalContext.current
     var records by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(ProcessingHistory.all(context)) }
-    var confirmClear by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }\n    var pendingDelete by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<ProcessingRecord?>(null) }
+    var confirmClear by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var pendingDelete by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<ProcessingRecord?>(null) }
     androidx.compose.foundation.layout.Column(
         modifier = androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFFF6F7F3)).padding(horizontal = 20.dp)
     ) {
