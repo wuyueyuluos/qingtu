@@ -1,0 +1,185 @@
+package com.example.qingtu
+
+import android.content.ContentValues
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color as AndroidColor
+import android.net.Uri
+import android.provider.MediaStore
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+
+private val BatchBg = Color(0xFFF6F7F3)
+private val BatchGreen = Color(0xFF496B5B)
+private val BatchInk = Color(0xFF26332C)
+private val BatchMuted = Color(0xFF89938B)
+
+@Composable
+internal fun BatchProcessingPage(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var images by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var mode by remember { mutableStateOf("压缩") }
+    var format by remember { mutableStateOf("JPG") }
+    var quality by remember { mutableFloatStateOf(80f) }
+    var scale by remember { mutableFloatStateOf(80f) }
+    var busy by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf("") }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { selected ->
+        if (selected.isNotEmpty()) {
+            images = selected
+            result = "已选择 ${selected.size} 张图片。"
+        }
+    }
+
+    Column(Modifier.fillMaxSize().background(BatchBg).verticalScroll(rememberScrollState()).padding(20.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, contentDescription = "返回") }
+            Text("批量处理", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = BatchInk)
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = { picker.launch("image/*") }, modifier = Modifier.fillMaxWidth(), enabled = !busy) {
+            Icon(Icons.Rounded.AddPhotoAlternate, null)
+            Spacer(Modifier.width(8.dp))
+            Text(if (images.isEmpty()) "选择多张图片" else "重新选择图片（当前 ${images.size} 张）")
+        }
+        if (images.isNotEmpty()) {
+            Text("已选中 ${images.size} 张图片", color = BatchGreen, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+            Text("所有图片都会单独生成新文件，原图不会被覆盖。", color = BatchMuted, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(18.dp))
+        Text("处理方式", color = BatchInk, fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            listOf("压缩", "格式转换", "调整尺寸").forEach {
+                FilterChip(selected = mode == it, onClick = { mode = it; result = "" }, label = { Text(it) }, enabled = !busy)
+            }
+        }
+        when (mode) {
+            "压缩" -> {
+                Text("压缩质量：${quality.toInt()}%", color = BatchInk, modifier = Modifier.padding(top = 12.dp))
+                Slider(value = quality, onValueChange = { quality = it }, valueRange = 10f..100f, enabled = !busy)
+                Text("质量越低，通常文件越小。批量压缩将输出 JPG 文件。", color = BatchMuted, fontSize = 12.sp)
+            }
+            "格式转换" -> {
+                Text("目标格式", color = BatchInk, modifier = Modifier.padding(top = 12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("JPG", "PNG", "WebP").forEach {
+                        FilterChip(selected = format == it, onClick = { format = it }, label = { Text(it) }, enabled = !busy)
+                    }
+                }
+                if (format != "PNG") {
+                    Text("转换质量：${quality.toInt()}%", color = BatchInk)
+                    Slider(value = quality, onValueChange = { quality = it }, valueRange = 10f..100f, enabled = !busy)
+                } else Text("PNG 为无损格式。", color = BatchMuted, fontSize = 12.sp)
+            }
+            else -> {
+                Text("缩放比例：${scale.toInt()}%", color = BatchInk, modifier = Modifier.padding(top = 12.dp))
+                Slider(value = scale, onValueChange = { scale = it }, valueRange = 10f..200f, enabled = !busy)
+                Text("所有图片按相同比例缩放，保持各自原图比例。", color = BatchMuted, fontSize = 12.sp)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        if (result.isNotEmpty()) {
+            Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+                Text(result, color = BatchGreen, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = {
+            val selected = images
+            if (selected.isNotEmpty() && !busy) {
+                busy = true
+                result = "正在处理图片，请稍候…"
+                scope.launch {
+                    val summary = withContext(Dispatchers.IO) {
+                        var success = 0
+                        val errors = mutableListOf<String>()
+                        selected.forEachIndexed { index, uri ->
+                            try {
+                                val input = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+                                    ?: error("无法读取图片")
+                                val currentMode = mode
+                                val currentFormat = format
+                                val currentQuality = quality.toInt()
+                                val currentScale = scale
+                                val outputBitmap: Bitmap
+                                val outputFormat: Bitmap.CompressFormat
+                                val ext: String
+                                val mime: String
+                                when (currentMode) {
+                                    "压缩" -> {
+                                        outputBitmap = if (input.hasAlpha()) Bitmap.createBitmap(input.width, input.height, Bitmap.Config.ARGB_8888).also { bmp ->
+                                            val canvas = Canvas(bmp); canvas.drawColor(AndroidColor.WHITE); canvas.drawBitmap(input, 0f, 0f, null)
+                                        } else input
+                                        outputFormat = Bitmap.CompressFormat.JPEG; ext = "jpg"; mime = "image/jpeg"
+                                    }
+                                    "格式转换" -> {
+                                        outputBitmap = if (currentFormat == "JPG" && input.hasAlpha()) Bitmap.createBitmap(input.width, input.height, Bitmap.Config.ARGB_8888).also { bmp ->
+                                            val canvas = Canvas(bmp); canvas.drawColor(AndroidColor.WHITE); canvas.drawBitmap(input, 0f, 0f, null)
+                                        } else input
+                                        outputFormat = when (currentFormat) { "PNG" -> Bitmap.CompressFormat.PNG; "WebP" -> Bitmap.CompressFormat.WEBP; else -> Bitmap.CompressFormat.JPEG }
+                                        ext = when (currentFormat) { "PNG" -> "png"; "WebP" -> "webp"; else -> "jpg" }
+                                        mime = when (currentFormat) { "PNG" -> "image/png"; "WebP" -> "image/webp"; else -> "image/jpeg" }
+                                    }
+                                    else -> {
+                                        val w = (input.width * currentScale / 100f).toInt().coerceAtLeast(1)
+                                        val h = (input.height * currentScale / 100f).toInt().coerceAtLeast(1)
+                                        outputBitmap = Bitmap.createScaledBitmap(input, w, h, true)
+                                        outputFormat = if (input.hasAlpha()) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+                                        ext = if (input.hasAlpha()) "png" else "jpg"
+                                        mime = if (input.hasAlpha()) "image/png" else "image/jpeg"
+                                    }
+                                }
+                                val buffer = ByteArrayOutputStream()
+                                val q = if (outputFormat == Bitmap.CompressFormat.PNG) 100 else currentQuality
+                                if (!outputBitmap.compress(outputFormat, q, buffer)) error("编码失败")
+                                if (outputBitmap !== input) outputBitmap.recycle()
+                                input.recycle()
+                                val values = ContentValues().apply {
+                                    put(MediaStore.Images.Media.DISPLAY_NAME, "轻图_批量_${System.currentTimeMillis()}_${index + 1}.$ext")
+                                    put(MediaStore.Images.Media.MIME_TYPE, mime)
+                                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/轻图")
+                                }
+                                val resolver = context.contentResolver
+                                val out = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: error("无法创建文件")
+                                try { resolver.openOutputStream(out)?.use { it.write(buffer.toByteArray()) } ?: error("写入失败") }
+                                catch (e: Exception) { resolver.delete(out, null, null); throw e }
+                                success++
+                            } catch (e: Exception) { errors.add("${index + 1}号图片：${e.message ?: "处理失败"}") }
+                        }
+                        "处理完成：成功 $success / ${selected.size} 张。失败 ${errors.size} 张。" + if (errors.isEmpty()) "" else "\n" + errors.take(5).joinToString("\n")
+                    }
+                    result = summary
+                    busy = false
+                }
+            }
+        }, enabled = images.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+            if (busy) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+            else Text("开始批量处理并保存")
+        }
+        Spacer(Modifier.height(12.dp))
+        Text("保存位置：Pictures/轻图/", color = BatchMuted, fontSize = 12.sp)
+    }
+}
