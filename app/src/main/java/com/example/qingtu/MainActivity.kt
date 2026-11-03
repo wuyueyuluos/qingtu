@@ -1,6 +1,6 @@
 package com.example.qingtu
 
-import android.content.ContentValues
+import android.content.Context\nimport android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import java.io.ByteArrayOutputStream
@@ -25,7 +25,7 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.*\nimport androidx.compose.ui.platform.LocalContext\nimport androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -78,7 +78,7 @@ fun QingTuApp() {
             Scaffold(
                 containerColor = PageBg,
                 bottomBar = {
-                    NavigationBar(containerColor = Color.White) {
+                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                         NavigationBarItem(selected = selectedTab == 0, onClick = { selectedTab = 0 },
                             icon = { Icon(Icons.Rounded.Image, null) }, label = { Text("首页") })
                         NavigationBarItem(selected = selectedTab == 1, onClick = { selectedTab = 1 },
@@ -91,7 +91,7 @@ fun QingTuApp() {
                 when (selectedTab) {
                     0 -> HomePage(Modifier.padding(padding), onCompress = { showCompressor = true }, onConvert = { showConverter = true }, onResize = { showResizer = true }, onBatch = { showBatch = true })
                     1 -> ProcessingHistoryPage()
-                    else -> SettingsPage()
+                    else -> SettingsPage(appearance = appearance, onAppearanceChange = { selected ->\n                        appearance = selected\n                        prefs.edit().putString("appearance", selected).apply()\n                    })
                 }
             }
         }
@@ -132,7 +132,7 @@ private fun HomePage(modifier: Modifier = Modifier, onCompress: () -> Unit, onCo
             }
         }
         Text("最近处理", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White),
+        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(18.dp)) {
             Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
                 Text("还没有处理记录", color = Muted, fontSize = 13.sp)
