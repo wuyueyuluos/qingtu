@@ -1,6 +1,7 @@
 package com.example.qingtu
 
-import android.content.Context\nimport android.content.ContentValues
+import android.content.Context
+import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import java.io.ByteArrayOutputStream
@@ -25,7 +26,9 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.*
-import androidx.compose.runtime.*\nimport androidx.compose.ui.platform.LocalContext\nimport androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,12 +43,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DecimalFormat
 
-private val PageBg = Color(0xFFF6F7F3)
-private val DeepGreen = Color(0xFF496B5B)
-private val SoftGreen = Color(0xFFE7EFE8)
-private val Ink = Color(0xFF26332C)
-private val Muted = Color(0xFF89938B)
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,17 +52,20 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun QingTuApp() {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("qingtu_settings", Context.MODE_PRIVATE) }
+    var appearance by remember { mutableStateOf(prefs.getString("appearance", "跟随系统") ?: "跟随系统") }
+    val darkTheme = when (appearance) {
+        "日间模式" -> false
+        "夜间模式" -> true
+        else -> isSystemInDarkTheme()
+    }
     var selectedTab by remember { mutableIntStateOf(0) }
     var showCompressor by remember { mutableStateOf(false) }
     var showConverter by remember { mutableStateOf(false) }
     var showResizer by remember { mutableStateOf(false) }
     var showBatch by remember { mutableStateOf(false) }
-    MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = DeepGreen, onPrimary = Color.White,
-            background = PageBg, surface = Color.White, onSurface = Ink
-        )
-    ) {
+    QingTuTheme(darkTheme = darkTheme) {
         if (showCompressor) {
             CompressionPage(onBack = { showCompressor = false })
         } else if (showConverter) {
@@ -91,7 +91,10 @@ fun QingTuApp() {
                 when (selectedTab) {
                     0 -> HomePage(Modifier.padding(padding), onCompress = { showCompressor = true }, onConvert = { showConverter = true }, onResize = { showResizer = true }, onBatch = { showBatch = true })
                     1 -> ProcessingHistoryPage()
-                    else -> SettingsPage(appearance = appearance, onAppearanceChange = { selected ->\n                        appearance = selected\n                        prefs.edit().putString("appearance", selected).apply()\n                    })
+                    else -> SettingsPage(appearance = appearance, onAppearanceChange = { selected ->
+                        appearance = selected
+                        prefs.edit().putString("appearance", selected).apply()
+                    })
                 }
             }
         }
