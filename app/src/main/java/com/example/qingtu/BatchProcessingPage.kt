@@ -142,7 +142,10 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
                     OutlinedButton(onClick = { browsingFolderPath = if (selectedFolderPath == "全部文件夹") "" else selectedFolderPath; showFolderBrowser = true }, modifier = Modifier.fillMaxWidth()) {
                         Text(if (selectedFolderPath == "全部文件夹") "路径：全部文件夹（点击浏览目录）" else "路径：/" + selectedFolderPath)
                     }
-                    val visibleGroups = if (selectedFolderPath == "全部文件夹") galleryGroups else galleryGroups.filter { it.path == selectedFolderPath }
+                    val selectedPrefix = selectedFolderPath.trimStart('/').let { if (it.isEmpty()) "" else if (it.endsWith("/")) it else "$it/" }
+                    val visibleGroups = if (selectedFolderPath == "全部文件夹") galleryGroups else galleryGroups.filter { group ->
+                        group.path.trimStart('/').let { path -> path == selectedPrefix.trimEnd('/') || path.startsWith(selectedPrefix) }
+                    }
                     if (visibleGroups.isEmpty()) Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) { Text("当前路径下没有图片", color = Muted) }
                     else LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxWidth().height(420.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         visibleGroups.forEach { group ->
