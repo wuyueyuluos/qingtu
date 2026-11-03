@@ -166,6 +166,7 @@ private fun CompressionPage(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var compressedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var originalBytes by remember { mutableLongStateOf(0L) }
     var compressedBytes by remember { mutableLongStateOf(0L) }
     var quality by remember { mutableFloatStateOf(75f) }
@@ -175,6 +176,7 @@ private fun CompressionPage(onBack: () -> Unit) {
         if (uri != null) {
             selectedUri = uri
             bitmap = null
+            compressedBitmap = null
             compressedBytes = 0L
             message = "正在读取图片…"
             scope.launch {
@@ -208,13 +210,30 @@ private fun CompressionPage(onBack: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         Card(Modifier.fillMaxWidth().weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White),
             shape = RoundedCornerShape(20.dp)) {
-            Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
-                val preview = bitmap
-                if (preview != null) {
-                    Image(preview.asImageBitmap(), contentDescription = "待压缩图片",
-                        modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            Column(Modifier.fillMaxSize().padding(12.dp)) {
+                val before = bitmap
+                val after = compressedBitmap
+                if (before != null && after != null) {
+                    Text("处理前后对比", color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("原图", color = DeepGreen, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Image(before.asImageBitmap(), contentDescription = "压缩前原图", modifier = Modifier.fillMaxWidth().weight(1f), contentScale = ContentScale.Fit)
+                            Text(before.width.toString() + " × " + before.height, color = Muted, fontSize = 11.sp)
+                            Text(formatBytes(originalBytes), color = Muted, fontSize = 11.sp)
+                        }
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("压缩后", color = DeepGreen, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Image(after.asImageBitmap(), contentDescription = "压缩后图片", modifier = Modifier.fillMaxWidth().weight(1f), contentScale = ContentScale.Fit)
+                            Text(after.width.toString() + " × " + after.height, color = Muted, fontSize = 11.sp)
+                            Text(formatBytes(compressedBytes), color = Muted, fontSize = 11.sp)
+                        }
+                    }
+                } else if (before != null) {
+                    Image(before.asImageBitmap(), contentDescription = "待压缩图片", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                 } else {
-                    Text("图片预览区域", color = Muted)
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("图片预览区域", color = Muted) }
                 }
             }
         }
@@ -266,17 +285,18 @@ private fun CompressionPage(onBack: () -> Unit) {
                                         stream.write(imageBytes)
                                     } ?: error("无法写入文件")
                                     ProcessingHistory.add(context, "图片压缩", selectedUri, output, originalBytes, imageBytes.size.toLong(), "质量 ${quality.toInt()}%")
-                                    Pair("已保存到 Pictures/轻图/", imageBytes.size.toLong())
+                                    Triple("已保存到 Pictures/轻图/", imageBytes.size.toLong(), BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size))
                                 } catch (e: Exception) {
                                     resolver.delete(output, null, null)
                                     throw e
                                 }
                             } catch (e: Exception) {
-                                Pair("保存失败：${e.message ?: "未知错误"}", 0L)
+                                Triple("保存失败：${e.message ?: "未知错误"}", 0L, null)
                             }
                         }
                         message = result.first
                         compressedBytes = result.second
+                        compressedBitmap = result.third
                         busy = false
                     }
                 }
