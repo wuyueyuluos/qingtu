@@ -117,7 +117,7 @@ private fun HomePage(modifier: Modifier = Modifier, onCompress: () -> Unit, onCo
                     Spacer(Modifier.height(6.dp))
                     Text("所有处理都在设备本地完成", fontSize = 13.sp, color = DeepGreen)
                 }
-                Box(Modifier.size(58.dp).background(Color.White.copy(alpha = 0.8f), CircleShape),
+                Box(Modifier.size(58.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f), CircleShape),
                     contentAlignment = Alignment.Center) {
                     Icon(Icons.Rounded.Compress, null, tint = DeepGreen, modifier = Modifier.size(30.dp))
                 }
@@ -150,7 +150,7 @@ private fun ToolCard(
     modifier: Modifier = Modifier, onClick: () -> Unit
 ) {
     Card(onClick = onClick, modifier = modifier.height(116.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(1.dp)) {
         Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Icon(icon, null, tint = DeepGreen, modifier = Modifier.size(25.dp))
@@ -211,7 +211,7 @@ private fun CompressionPage(onBack: () -> Unit) {
             Text(if (bitmap == null) "选择图片" else "重新选择图片")
         }
         Spacer(Modifier.height(16.dp))
-        Card(Modifier.fillMaxWidth().weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White),
+        Card(Modifier.fillMaxWidth().weight(1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(20.dp)) {
             Column(Modifier.fillMaxSize().padding(12.dp)) {
                 val before = bitmap
