@@ -33,10 +33,6 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.text.DecimalFormat
 
-private val ConvertBg = Color(0xFFF6F7F3)
-private val ConvertGreen = Color(0xFF496B5B)
-private val ConvertInk = Color(0xFF26332C)
-private val ConvertMuted = Color(0xFF89938B)
 
 @Composable
 internal fun FormatConversionPage(onBack: () -> Unit) {
@@ -68,10 +64,10 @@ internal fun FormatConversionPage(onBack: () -> Unit) {
             }
         }
     }
-    Column(Modifier.fillMaxSize().background(ConvertBg).padding(20.dp)) {
+    Column(Modifier.fillMaxSize().background(PageBg).padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, contentDescription = "返回") }
-            Text("格式转换", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = ConvertInk)
+            Text("格式转换", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
         }
         Spacer(Modifier.height(10.dp))
         OutlinedButton(onClick = { picker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
@@ -80,33 +76,33 @@ internal fun FormatConversionPage(onBack: () -> Unit) {
             Text(if (bitmap == null) "选择图片" else "重新选择图片")
         }
         Spacer(Modifier.height(14.dp))
-        Card(Modifier.fillMaxWidth().weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp)) {
+        Card(Modifier.fillMaxWidth().weight(1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(20.dp)) {
             Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
                 val preview = bitmap
                 if (preview != null) Image(preview.asImageBitmap(), contentDescription = "图片预览", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                else Text("图片预览区域", color = ConvertMuted)
+                else Text("图片预览区域", color = Muted)
             }
         }
         Spacer(Modifier.height(16.dp))
-        Text("目标格式", color = ConvertInk, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Text("目标格式", color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             listOf("JPG", "PNG", "WebP").forEach { item ->
                 FilterChip(selected = format == item, onClick = { format = item; convertedBytes = 0L }, label = { Text(item) }, enabled = !busy)
             }
         }
         if (format == "PNG") {
-            Text("PNG 为无损格式，不需要调整质量。", color = ConvertMuted, fontSize = 12.sp)
+            Text("PNG 为无损格式，不需要调整质量。", color = Muted, fontSize = 12.sp)
         } else {
-            Text("转换质量：" + quality.toInt() + "%", color = ConvertInk, fontWeight = FontWeight.Medium)
+            Text("转换质量：" + quality.toInt() + "%", color = Ink, fontWeight = FontWeight.Medium)
             Slider(value = quality, onValueChange = { quality = it }, valueRange = 10f..100f, enabled = bitmap != null && !busy)
         }
-        if (originalBytes > 0L) Text("原始大小：" + convertBytes(originalBytes), color = ConvertGreen, fontSize = 13.sp)
+        if (originalBytes > 0L) Text("原始大小：" + convertBytes(originalBytes), color = DeepGreen, fontSize = 13.sp)
         if (convertedBytes > 0L) {
             val diff = ((originalBytes - convertedBytes).toDouble() / originalBytes * 100).toInt()
-            Text("转换后：" + convertBytes(convertedBytes), color = ConvertGreen, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(if (diff >= 0) "体积减少 " + diff + "%" else "文件增大了 " + (-diff) + "%", color = ConvertMuted, fontSize = 12.sp)
+            Text("转换后：" + convertBytes(convertedBytes), color = DeepGreen, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(if (diff >= 0) "体积减少 " + diff + "%" else "文件增大了 " + (-diff) + "%", color = Muted, fontSize = 12.sp)
         }
-        Text(message, color = ConvertMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+        Text(message, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         Spacer(Modifier.height(8.dp))
         Button(onClick = {
             val source = bitmap
