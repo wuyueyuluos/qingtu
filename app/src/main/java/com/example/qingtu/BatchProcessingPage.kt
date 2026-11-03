@@ -20,7 +20,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
@@ -46,7 +47,9 @@ import kotlinx.coroutines.withContext
 private val BatchBg = Color(0xFFF6F7F3)
 private val BatchGreen = Color(0xFF496B5B)
 private val BatchInk = Color(0xFF26332C)
-private val BatchMuted = Color(0xFF89938B)\n\nprivate fun queryBatchGallery(context: android.content.Context): List<Uri> {\n    val result = mutableListOf<Uri>()\n    val projection = arrayOf(MediaStore.Images.Media._ID)\n    val sort = "${MediaStore.Images.Media.DATE_ADDED} DESC"\n    context.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null, sort)?.use { cursor ->\n        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)\n        while (cursor.moveToNext()) {\n            result.add(Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cursor.getLong(idColumn).toString()))\n        }\n    }\n    return result\n}
+private val BatchMuted = Color(0xFF89938B)
+
+private fun queryBatchGallery(context: android.content.Context): List<Uri> {\n    val result = mutableListOf<Uri>()\n    val projection = arrayOf(MediaStore.Images.Media._ID)\n    val sort = "${MediaStore.Images.Media.DATE_ADDED} DESC"\n    context.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null, sort)?.use { cursor ->\n        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)\n        while (cursor.moveToNext()) {\n            result.add(Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cursor.getLong(idColumn).toString()))\n        }\n    }\n    return result\n}
 
 @Composable
 internal fun BatchProcessingPage(onBack: () -> Unit) {
@@ -59,12 +62,20 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
     var scale by remember { mutableFloatStateOf(80f) }
     var busy by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf("") }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { selected ->
-        if (selected.isNotEmpty()) {
-            images = selected
-            result = "已选择 ${selected.size} 张图片。"
-        }
+    var galleryUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var selectedGalleryUris by remember { mutableStateOf<Set<Uri>>(emptySet()) }
+    var showGallery by remember { mutableStateOf(false) }
+    val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            scope.launch {
+                galleryUris = withContext(Dispatchers.IO) { queryBatchGallery(context) }
+                selectedGalleryUris = emptySet()
+                showGallery = true
+            }
+        } else result = "需要允许轻图访问图片，才能显示本地图片列表。"
     }
+
 
 
     if (showGallery) {
