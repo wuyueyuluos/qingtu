@@ -101,31 +101,31 @@ internal fun ProcessingHistoryPage() {
     var confirmClear by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var pendingDelete by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<ProcessingRecord?>(null) }
     androidx.compose.foundation.layout.Column(
-        modifier = androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFFF6F7F3)).padding(horizontal = 20.dp)
+        modifier = androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background).padding(horizontal = 20.dp)
     ) {
         androidx.compose.foundation.layout.Row(
             modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 16.dp),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
-            androidx.compose.material3.Text("处理记录", fontSize = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF26332C), modifier = androidx.compose.ui.Modifier.weight(1f))
+            androidx.compose.material3.Text("处理记录", fontSize = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground, modifier = androidx.compose.ui.Modifier.weight(1f))
             if (records.isNotEmpty()) androidx.compose.material3.TextButton(onClick = { confirmClear = true }) { androidx.compose.material3.Text("清空") }
         }
         if (records.isEmpty()) {
             androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                androidx.compose.material3.Text("还没有处理记录\n处理完成的图片会显示在这里。", color = androidx.compose.ui.graphics.Color(0xFF89938B), textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 22.sp)
+                androidx.compose.material3.Text("还没有处理记录\n处理完成的图片会显示在这里。", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 22.sp)
             }
         } else {
             androidx.compose.foundation.lazy.LazyColumn(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)) {
                 items(records.size) { index ->
                     val r = records[index]
-                    androidx.compose.material3.Card(modifier = androidx.compose.ui.Modifier.fillMaxWidth(), shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)) {
+                    androidx.compose.material3.Card(modifier = androidx.compose.ui.Modifier.fillMaxWidth(), shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface)) {
                         androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(14.dp)) {
                             androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                androidx.compose.material3.Text(r.action, color = androidx.compose.ui.graphics.Color(0xFF496B5B), fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 15.sp, modifier = androidx.compose.ui.Modifier.weight(1f))
+                                androidx.compose.material3.Text(r.action, color = androidx.compose.material3.MaterialTheme.colorScheme.primary, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 15.sp, modifier = androidx.compose.ui.Modifier.weight(1f))
                                 androidx.compose.material3.Text(ProcessingHistory.date(r.time), color = androidx.compose.ui.graphics.Color(0xFF89938B), fontSize = 11.sp)
                             }
                             androidx.compose.material3.Text(r.sourceName, color = androidx.compose.ui.graphics.Color(0xFF26332C), fontSize = 13.sp, modifier = androidx.compose.ui.Modifier.padding(top = 8.dp))
-                            androidx.compose.material3.Text("输出：${r.outputName}", color = androidx.compose.ui.graphics.Color(0xFF647168), fontSize = 12.sp, modifier = androidx.compose.ui.Modifier.padding(top = 3.dp))
+                            androidx.compose.material3.Text("输出：${r.outputName}", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = androidx.compose.ui.Modifier.padding(top = 3.dp))
                             androidx.compose.foundation.layout.Row(
                                 modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(top = 6.dp),
                                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
