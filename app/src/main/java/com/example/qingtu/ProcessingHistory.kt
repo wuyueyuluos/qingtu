@@ -122,9 +122,9 @@ internal fun ProcessingHistoryPage() {
                         androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(14.dp)) {
                             androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                 androidx.compose.material3.Text(r.action, color = androidx.compose.material3.MaterialTheme.colorScheme.primary, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 15.sp, modifier = androidx.compose.ui.Modifier.weight(1f))
-                                androidx.compose.material3.Text(ProcessingHistory.date(r.time), color = androidx.compose.ui.graphics.Color(0xFF89938B), fontSize = 11.sp)
+                                androidx.compose.material3.Text(ProcessingHistory.date(r.time), color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                             }
-                            androidx.compose.material3.Text(r.sourceName, color = androidx.compose.ui.graphics.Color(0xFF26332C), fontSize = 13.sp, modifier = androidx.compose.ui.Modifier.padding(top = 8.dp))
+                            androidx.compose.material3.Text(r.sourceName, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, modifier = androidx.compose.ui.Modifier.padding(top = 8.dp))
                             androidx.compose.material3.Text("输出：${r.outputName}", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = androidx.compose.ui.Modifier.padding(top = 3.dp))
                             androidx.compose.foundation.layout.Row(
                                 modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(top = 6.dp),
@@ -134,7 +134,7 @@ internal fun ProcessingHistoryPage() {
                                     androidx.compose.material3.Text("查看图片")
                                 }
                                 androidx.compose.material3.TextButton(onClick = { pendingDelete = r }) {
-                                    androidx.compose.material3.Text("删除记录", color = androidx.compose.ui.graphics.Color(0xFF9A625B))
+                                    androidx.compose.material3.Text("删除记录", color = androidx.compose.material3.MaterialTheme.colorScheme.error)
                                 }
                             }
                             androidx.compose.material3.Text("${ProcessingHistory.size(r.sourceBytes)} → ${ProcessingHistory.size(r.outputBytes)}" + if (r.details.isNotBlank()) " · ${r.details}" else "", color = androidx.compose.ui.graphics.Color(0xFF89938B), fontSize = 11.sp, modifier = androidx.compose.ui.Modifier.padding(top = 7.dp))
