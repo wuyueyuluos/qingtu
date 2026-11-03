@@ -58,6 +58,7 @@ fun QingTuApp() {
     var selectedTab by remember { mutableIntStateOf(0) }
     var showCompressor by remember { mutableStateOf(false) }
     var showConverter by remember { mutableStateOf(false) }
+    var showResizer by remember { mutableStateOf(false) }
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = DeepGreen, onPrimary = Color.White,
@@ -68,6 +69,8 @@ fun QingTuApp() {
             CompressionPage(onBack = { showCompressor = false })
         } else if (showConverter) {
             FormatConversionPage(onBack = { showConverter = false })
+        } else if (showResizer) {
+            ResizePage(onBack = { showResizer = false })
         } else {
             Scaffold(
                 containerColor = PageBg,
@@ -83,7 +86,7 @@ fun QingTuApp() {
                 }
             ) { padding ->
                 when (selectedTab) {
-                    0 -> HomePage(Modifier.padding(padding), onCompress = { showCompressor = true }, onConvert = { showConverter = true })
+                    0 -> HomePage(Modifier.padding(padding), onCompress = { showCompressor = true }, onConvert = { showConverter = true }, onResize = { showResizer = true })
                     1 -> EmptyPage("处理记录", "完成的图片会保存在这里。")
                     else -> EmptyPage("设置", "默认保存位置、图片信息与外观设置将在这里提供。")
                 }
@@ -93,7 +96,7 @@ fun QingTuApp() {
 }
 
 @Composable
-private fun HomePage(modifier: Modifier = Modifier, onCompress: () -> Unit, onConvert: () -> Unit) {
+private fun HomePage(modifier: Modifier = Modifier, onCompress: () -> Unit, onConvert: () -> Unit, onResize: () -> Unit) {
     Column(
         modifier = modifier.fillMaxSize().padding(horizontal = 22.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
@@ -121,7 +124,7 @@ private fun HomePage(modifier: Modifier = Modifier, onCompress: () -> Unit, onCo
                 ToolCard("格式转换", "JPG、PNG、WebP", Icons.Rounded.SwapHoriz, Modifier.weight(1f), onConvert)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ToolCard("调整尺寸", "修改宽度和高度", Icons.Rounded.Tune, Modifier.weight(1f)) {}
+                ToolCard("调整尺寸", "修改宽度和高度", Icons.Rounded.Tune, Modifier.weight(1f), onResize)
                 ToolCard("批量处理", "一次处理多张图片", Icons.Rounded.Image, Modifier.weight(1f)) {}
             }
         }
