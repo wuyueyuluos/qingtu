@@ -44,17 +44,21 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
 
-private fun queryBatchGallery(context: android.content.Context): List<Uri> {
-    val result = mutableListOf<Uri>()
-    val projection = arrayOf(MediaStore.Images.Media._ID)
-    val sort = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+private data class BatchFolderGroup(val path: String, val uris: List<Uri>)
+private fun queryBatchGallery(context: android.content.Context): List<BatchFolderGroup> {
+    val grouped = linkedMapOf<String, MutableList<Uri>>()
+    val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.RELATIVE_PATH)
+    val sort = "${MediaStore.Images.Media.RELATIVE_PATH} ASC, ${MediaStore.Images.Media.DISPLAY_NAME} ASC"
     context.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null, sort)?.use { cursor ->
         val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+        val pathColumn = cursor.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
         while (cursor.moveToNext()) {
-            result.add(Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cursor.getLong(idColumn).toString()))
+            val path = if (pathColumn >= 0) cursor.getString(pathColumn) ?: "其他" else "其他"
+            val uri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cursor.getLong(idColumn).toString())
+            grouped.getOrPut(path) { mutableListOf() }.add(uri)
         }
     }
-    return result
+    return grouped.map { BatchFolderGroup(it.key, it.value) }
 }
 
 @Composable
@@ -68,14 +72,16 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
     var scale by remember { mutableFloatStateOf(80f) }
     var busy by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf("") }
-    var galleryUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var galleryGroups by remember { mutableStateOf<List<BatchFolderGroup>>(emptyList()) }
+    var selectedFolderPath by remember { mutableStateOf(context.getSharedPreferences("qingtu_settings", android.content.Context.MODE_PRIVATE).getString("batch_gallery_folder", "全部文件夹") ?: "全部文件夹") }
+    var folderMenuExpanded by remember { mutableStateOf(false) }
     var selectedGalleryUris by remember { mutableStateOf<Set<Uri>>(emptySet()) }
     var showGallery by remember { mutableStateOf(false) }
     val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             scope.launch {
-                galleryUris = withContext(Dispatchers.IO) { queryBatchGallery(context) }
+                galleryGroups = withContext(Dispatchers.IO) { queryBatchGallery(context) }
                 selectedGalleryUris = emptySet()
                 showGallery = true
             }
@@ -85,45 +91,40 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
 
 
     if (showGallery) {
-        AlertDialog(
-            onDismissRequest = { showGallery = false },
+        AlertDialog(onDismissRequest = { showGallery = false },
             title = { Text("选择图片（已选 ${selectedGalleryUris.size} 张）") },
             text = {
-                if (galleryUris.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-                        Text("没有找到本地图片", color = Muted)
+                Column(Modifier.fillMaxWidth()) {
+                    val folderOptions = listOf("全部文件夹") + galleryGroups.map { it.path }
+                    Box(Modifier.fillMaxWidth()) {
+                        OutlinedButton(onClick = { folderMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text(if (selectedFolderPath == "全部文件夹") "路径：全部文件夹" else "路径：" + selectedFolderPath) }
+                        DropdownMenu(expanded = folderMenuExpanded, onDismissRequest = { folderMenuExpanded = false }) {
+                            folderOptions.forEach { path -> DropdownMenuItem(text = { Text(if (path == "全部文件夹") path else path.trimEnd('/').substringAfterLast('/')) }, onClick = {
+                                selectedFolderPath = path
+                                context.getSharedPreferences("qingtu_settings", android.content.Context.MODE_PRIVATE).edit().putString("batch_gallery_folder", path).apply()
+                                folderMenuExpanded = false
+                            }) }
+                        }
                     }
-                } else {
-                    LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxWidth().height(420.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(galleryUris) { uri ->
-                            var thumb by remember(uri) { mutableStateOf<Bitmap?>(null) }
-                            LaunchedEffect(uri) {
-                                thumb = withContext(Dispatchers.IO) {
-                                    try { context.contentResolver.loadThumbnail(uri, Size(240, 240), null) } catch (_: Exception) { null }
-                                }
-                            }
-                            val selected = selectedGalleryUris.contains(uri)
-                            Box(Modifier.aspectRatio(1f).background(Color(0xFFE8ECE8), RoundedCornerShape(8.dp)).clickable {
-                                selectedGalleryUris = if (selected) selectedGalleryUris - uri else selectedGalleryUris + uri
-                            }) {
-                                if (thumb != null) androidx.compose.foundation.Image(thumb!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
-                                if (selected) {
-                                    Box(Modifier.align(Alignment.TopEnd).padding(5.dp).background(DeepGreen, CircleShape), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Rounded.CheckCircle, null, tint = Color.White, modifier = Modifier.size(22.dp))
-                                    }
+                    val visibleGroups = if (selectedFolderPath == "全部文件夹") galleryGroups else galleryGroups.filter { it.path == selectedFolderPath }
+                    if (visibleGroups.isEmpty()) Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) { Text("当前路径下没有图片", color = Muted) }
+                    else LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxWidth().height(420.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        visibleGroups.forEach { group ->
+                            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { Text(group.path.trimEnd('/').substringAfterLast('/').ifBlank { group.path }, color = DeepGreen, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 3.dp)) }
+                            items(group.uris) { uri ->
+                                var thumb by remember(uri) { mutableStateOf<Bitmap?>(null) }
+                                LaunchedEffect(uri) { thumb = withContext(Dispatchers.IO) { try { context.contentResolver.loadThumbnail(uri, Size(240, 240), null) } catch (_: Exception) { null } } }
+                                val selected = selectedGalleryUris.contains(uri)
+                                Box(Modifier.aspectRatio(1f).background(Color(0xFFE8ECE8), RoundedCornerShape(8.dp)).clickable { selectedGalleryUris = if (selected) selectedGalleryUris - uri else selectedGalleryUris + uri }) {
+                                    if (thumb != null) androidx.compose.foundation.Image(thumb!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                                    if (selected) Box(Modifier.align(Alignment.TopEnd).padding(5.dp).background(DeepGreen, CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.CheckCircle, null, tint = Color.White, modifier = Modifier.size(22.dp)) }
                                 }
                             }
                         }
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    images = selectedGalleryUris.toList()
-                    result = "已选择 ${images.size} 张图片。"
-                    showGallery = false
-                }, enabled = selectedGalleryUris.isNotEmpty()) { Text("确定（${selectedGalleryUris.size}）") }
-            },
+            confirmButton = { TextButton(onClick = { images = selectedGalleryUris.toList(); result = "已选择 ${images.size} 张图片。"; showGallery = false }, enabled = selectedGalleryUris.isNotEmpty()) { Text("确定（${selectedGalleryUris.size}）") } },
             dismissButton = { TextButton(onClick = { showGallery = false }) { Text("取消") } }
         )
     }
@@ -138,7 +139,7 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
             val granted = androidx.core.content.ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
             if (granted) {
                 scope.launch {
-                    galleryUris = withContext(Dispatchers.IO) { queryBatchGallery(context) }
+                    galleryGroups = withContext(Dispatchers.IO) { queryBatchGallery(context) }
                     selectedGalleryUris = emptySet()
                     showGallery = true
                 }
