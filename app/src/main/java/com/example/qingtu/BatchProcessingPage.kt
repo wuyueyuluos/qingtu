@@ -214,10 +214,12 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
                                 val mime: String
                                 when (currentMode) {
                                     "压缩" -> {
-                                        outputBitmap = if (input.hasAlpha()) Bitmap.createBitmap(input.width, input.height, Bitmap.Config.ARGB_8888).also { bmp ->
+                                        val sourceName = getImageDisplayName(context, uri)
+                                        val encoded = imageFormatFromMime(context.contentResolver.getType(uri) ?: "", sourceName)
+                                        outputBitmap = if (encoded.format == Bitmap.CompressFormat.JPEG && input.hasAlpha()) Bitmap.createBitmap(input.width, input.height, Bitmap.Config.ARGB_8888).also { bmp ->
                                             val canvas = Canvas(bmp); canvas.drawColor(AndroidColor.WHITE); canvas.drawBitmap(input, 0f, 0f, null)
                                         } else input
-                                        outputFormat = Bitmap.CompressFormat.JPEG; ext = "jpg"; mime = "image/jpeg"
+                                        outputFormat = encoded.format; ext = encoded.extension; mime = encoded.mime
                                     }
                                     "格式转换" -> {
                                         outputBitmap = if (currentFormat == "JPG" && input.hasAlpha()) Bitmap.createBitmap(input.width, input.height, Bitmap.Config.ARGB_8888).also { bmp ->
@@ -231,9 +233,10 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
                                         val w = (input.width * currentScale / 100f).toInt().coerceAtLeast(1)
                                         val h = (input.height * currentScale / 100f).toInt().coerceAtLeast(1)
                                         outputBitmap = Bitmap.createScaledBitmap(input, w, h, true)
-                                        outputFormat = if (input.hasAlpha()) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
-                                        ext = if (input.hasAlpha()) "png" else "jpg"
-                                        mime = if (input.hasAlpha()) "image/png" else "image/jpeg"
+                                        val encoded = imageFormatFromMime(context.contentResolver.getType(uri) ?: "", getImageDisplayName(context, uri))
+                                        outputFormat = encoded.format
+                                        ext = encoded.extension
+                                        mime = encoded.mime
                                     }
                                 }
                                 val buffer = ByteArrayOutputStream()
@@ -242,7 +245,7 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
                                 if (outputBitmap !== input) outputBitmap.recycle()
                                 input.recycle()
                                 val values = ContentValues().apply {
-                                    put(MediaStore.Images.Media.DISPLAY_NAME, "轻图_批量_${System.currentTimeMillis()}_${index + 1}.$ext")
+                                    put(MediaStore.Images.Media.DISPLAY_NAME, outputImageName(context, uri, ext))
                                     put(MediaStore.Images.Media.MIME_TYPE, mime)
                                     put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/轻图")
                                 }
