@@ -43,6 +43,7 @@ internal fun FormatConversionPage(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var sourceUri by remember { mutableStateOf<Uri?>(null) }
     var originalBytes by remember { mutableLongStateOf(0L) }
     var convertedBytes by remember { mutableLongStateOf(0L) }
     var format by remember { mutableStateOf("JPG") }
@@ -51,6 +52,7 @@ internal fun FormatConversionPage(onBack: () -> Unit) {
     var message by remember { mutableStateOf("选择图片，再选择想要转换的格式。") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
+            sourceUri = uri
             bitmap = null
             convertedBytes = 0L
             message = "正在读取图片…"
@@ -143,6 +145,7 @@ internal fun FormatConversionPage(onBack: () -> Unit) {
                             val output = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: error("无法创建保存文件")
                             try {
                                 resolver.openOutputStream(output)?.use { it.write(bytes) } ?: error("无法写入文件")
+                                ProcessingHistory.add(context, "格式转换", sourceUri, output, originalBytes, bytes.size.toLong(), "转为 $selectedFormat")
                                 Pair("已保存到 Pictures/轻图/", bytes.size.toLong())
                             } catch (e: Exception) {
                                 resolver.delete(output, null, null)
