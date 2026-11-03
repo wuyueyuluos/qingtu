@@ -42,14 +42,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
-import kotlinx.coroutines.withContext
 
 private val BatchBg = Color(0xFFF6F7F3)
 private val BatchGreen = Color(0xFF496B5B)
 private val BatchInk = Color(0xFF26332C)
 private val BatchMuted = Color(0xFF89938B)
 
-private fun queryBatchGallery(context: android.content.Context): List<Uri> {\n    val result = mutableListOf<Uri>()\n    val projection = arrayOf(MediaStore.Images.Media._ID)\n    val sort = "${MediaStore.Images.Media.DATE_ADDED} DESC"\n    context.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null, sort)?.use { cursor ->\n        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)\n        while (cursor.moveToNext()) {\n            result.add(Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cursor.getLong(idColumn).toString()))\n        }\n    }\n    return result\n}
+private fun queryBatchGallery(context: android.content.Context): List<Uri> {
+    val result = mutableListOf<Uri>()
+    val projection = arrayOf(MediaStore.Images.Media._ID)
+    val sort = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+    context.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null, sort)?.use { cursor ->
+        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+        while (cursor.moveToNext()) {
+            result.add(Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cursor.getLong(idColumn).toString()))
+        }
+    }
+    return result\n}
 
 @Composable
 internal fun BatchProcessingPage(onBack: () -> Unit) {
@@ -121,7 +130,8 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
             dismissButton = { TextButton(onClick = { showGallery = false }) { Text("取消") } }
         )
     }
-\n    Column(Modifier.fillMaxSize().background(BatchBg).verticalScroll(rememberScrollState()).padding(20.dp)) {
+
+    Column(Modifier.fillMaxSize().background(BatchBg).verticalScroll(rememberScrollState()).padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, contentDescription = "返回") }
             Text("批量处理", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = BatchInk)
