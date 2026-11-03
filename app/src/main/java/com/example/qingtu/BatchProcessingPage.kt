@@ -43,10 +43,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
-private val BatchBg = Color(0xFFF6F7F3)
-private val BatchGreen = Color(0xFF496B5B)
-private val BatchInk = Color(0xFF26332C)
-private val BatchMuted = Color(0xFF89938B)
 
 private fun queryBatchGallery(context: android.content.Context): List<Uri> {
     val result = mutableListOf<Uri>()
@@ -95,7 +91,7 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
             text = {
                 if (galleryUris.isEmpty()) {
                     Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-                        Text("没有找到本地图片", color = BatchMuted)
+                        Text("没有找到本地图片", color = Muted)
                     }
                 } else {
                     LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxWidth().height(420.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -112,7 +108,7 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
                             }) {
                                 if (thumb != null) androidx.compose.foundation.Image(thumb!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
                                 if (selected) {
-                                    Box(Modifier.align(Alignment.TopEnd).padding(5.dp).background(BatchGreen, CircleShape), contentAlignment = Alignment.Center) {
+                                    Box(Modifier.align(Alignment.TopEnd).padding(5.dp).background(DeepGreen, CircleShape), contentAlignment = Alignment.Center) {
                                         Icon(Icons.Rounded.CheckCircle, null, tint = Color.White, modifier = Modifier.size(22.dp))
                                     }
                                 }
@@ -132,10 +128,10 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
         )
     }
 
-    Column(Modifier.fillMaxSize().background(BatchBg).verticalScroll(rememberScrollState()).padding(20.dp)) {
+    Column(Modifier.fillMaxSize().background(PageBg).verticalScroll(rememberScrollState()).padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, contentDescription = "返回") }
-            Text("批量处理", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = BatchInk)
+            Text("批量处理", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink)
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = {
@@ -153,11 +149,11 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
             Text(if (images.isEmpty()) "从本机相册选择图片" else "重新选择图片（当前 ${images.size} 张）")
         }
         if (images.isNotEmpty()) {
-            Text("已选中 ${images.size} 张图片", color = BatchGreen, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
-            Text("所有图片都会单独生成新文件，原图不会被覆盖。", color = BatchMuted, fontSize = 12.sp)
+            Text("已选中 ${images.size} 张图片", color = DeepGreen, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+            Text("所有图片都会单独生成新文件，原图不会被覆盖。", color = Muted, fontSize = 12.sp)
         }
         Spacer(Modifier.height(18.dp))
-        Text("处理方式", color = BatchInk, fontWeight = FontWeight.SemiBold)
+        Text("处理方式", color = Ink, fontWeight = FontWeight.SemiBold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
             listOf("压缩", "格式转换", "调整尺寸").forEach {
                 FilterChip(selected = mode == it, onClick = { mode = it; result = "" }, label = { Text(it) }, enabled = !busy)
@@ -165,32 +161,32 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
         }
         when (mode) {
             "压缩" -> {
-                Text("压缩质量：${quality.toInt()}%", color = BatchInk, modifier = Modifier.padding(top = 12.dp))
+                Text("压缩质量：${quality.toInt()}%", color = Ink, modifier = Modifier.padding(top = 12.dp))
                 Slider(value = quality, onValueChange = { quality = it }, valueRange = 10f..100f, enabled = !busy)
-                Text("质量越低，通常文件越小。批量压缩将输出 JPG 文件。", color = BatchMuted, fontSize = 12.sp)
+                Text("质量越低，通常文件越小。批量压缩将输出 JPG 文件。", color = Muted, fontSize = 12.sp)
             }
             "格式转换" -> {
-                Text("目标格式", color = BatchInk, modifier = Modifier.padding(top = 12.dp))
+                Text("目标格式", color = Ink, modifier = Modifier.padding(top = 12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("JPG", "PNG", "WebP").forEach {
                         FilterChip(selected = format == it, onClick = { format = it }, label = { Text(it) }, enabled = !busy)
                     }
                 }
                 if (format != "PNG") {
-                    Text("转换质量：${quality.toInt()}%", color = BatchInk)
+                    Text("转换质量：${quality.toInt()}%", color = Ink)
                     Slider(value = quality, onValueChange = { quality = it }, valueRange = 10f..100f, enabled = !busy)
-                } else Text("PNG 为无损格式。", color = BatchMuted, fontSize = 12.sp)
+                } else Text("PNG 为无损格式。", color = Muted, fontSize = 12.sp)
             }
             else -> {
-                Text("缩放比例：${scale.toInt()}%", color = BatchInk, modifier = Modifier.padding(top = 12.dp))
+                Text("缩放比例：${scale.toInt()}%", color = Ink, modifier = Modifier.padding(top = 12.dp))
                 Slider(value = scale, onValueChange = { scale = it }, valueRange = 10f..200f, enabled = !busy)
-                Text("所有图片按相同比例缩放，保持各自原图比例。", color = BatchMuted, fontSize = 12.sp)
+                Text("所有图片按相同比例缩放，保持各自原图比例。", color = Muted, fontSize = 12.sp)
             }
         }
         Spacer(Modifier.height(12.dp))
         if (result.isNotEmpty()) {
-            Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-                Text(result, color = BatchGreen, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+                Text(result, color = DeepGreen, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -272,6 +268,6 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
             else Text("开始批量处理并保存")
         }
         Spacer(Modifier.height(12.dp))
-        Text("保存位置：Pictures/轻图/", color = BatchMuted, fontSize = 12.sp)
+        Text("保存位置：Pictures/轻图/", color = Muted, fontSize = 12.sp)
     }
 }
