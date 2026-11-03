@@ -133,7 +133,7 @@ internal fun FormatConversionPage(onBack: () -> Unit) {
                             val ext = when (selectedFormat) { "PNG" -> "png"; "WebP" -> "webp"; else -> "jpg" }
                             val mime = when (selectedFormat) { "PNG" -> "image/png"; "WebP" -> "image/webp"; else -> "image/jpeg" }
                             val values = ContentValues().apply {
-                                put(MediaStore.Images.Media.DISPLAY_NAME, "轻图_" + System.currentTimeMillis() + "." + ext)
+                                put(MediaStore.Images.Media.DISPLAY_NAME, sourceUri?.let { outputImageName(context, it, ext) } ?: ("图片." + ext))
                                 put(MediaStore.Images.Media.MIME_TYPE, mime)
                                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/轻图")
                             }
