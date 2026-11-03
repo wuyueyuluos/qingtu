@@ -171,6 +171,7 @@ private fun CompressionPage(onBack: () -> Unit) {
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     var compressedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var originalBytes by remember { mutableLongStateOf(0L) }
+    var sourceMime by remember { mutableStateOf("image/jpeg") }
     var compressedBytes by remember { mutableLongStateOf(0L) }
     var quality by remember { mutableFloatStateOf(75f) }
     var busy by remember { mutableStateOf(false) }
@@ -178,6 +179,7 @@ private fun CompressionPage(onBack: () -> Unit) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             selectedUri = uri
+            sourceMime = context.contentResolver.getType(uri) ?: "image/jpeg"
             bitmap = null
             compressedBitmap = null
             compressedBytes = 0L
@@ -270,14 +272,17 @@ private fun CompressionPage(onBack: () -> Unit) {
                     scope.launch {
                         val result = withContext(Dispatchers.IO) {
                             try {
+                                val originalName = selectedUri?.let { getImageDisplayName(context, it) } ?: "图片.jpg"
+                                val outputFormat = imageFormatFromMime(sourceMime, originalName)
                                 val buffer = ByteArrayOutputStream()
-                                if (!source.compress(Bitmap.CompressFormat.JPEG, quality.toInt(), buffer)) {
+                                if (!source.compress(outputFormat.format, quality.toInt(), buffer)) {
                                     error("图片压缩失败")
                                 }
                                 val imageBytes = buffer.toByteArray()
+                                val outputName = selectedUri?.let { outputImageName(context, it, outputFormat.extension) } ?: ("图片." + outputFormat.extension)
                                 val values = ContentValues().apply {
-                                    put(MediaStore.Images.Media.DISPLAY_NAME, "轻图_${System.currentTimeMillis()}.jpg")
-                                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                                    put(MediaStore.Images.Media.DISPLAY_NAME, outputName)
+                                    put(MediaStore.Images.Media.MIME_TYPE, outputFormat.mime)
                                     put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/轻图")
                                 }
                                 val resolver = context.contentResolver
