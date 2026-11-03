@@ -74,7 +74,8 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
     var result by remember { mutableStateOf("") }
     var galleryGroups by remember { mutableStateOf<List<BatchFolderGroup>>(emptyList()) }
     var selectedFolderPath by remember { mutableStateOf(context.getSharedPreferences("qingtu_settings", android.content.Context.MODE_PRIVATE).getString("batch_gallery_folder", "全部文件夹") ?: "全部文件夹") }
-    var folderMenuExpanded by remember { mutableStateOf(false) }
+    var showFolderBrowser by remember { mutableStateOf(false) }
+    var browsingFolderPath by remember { mutableStateOf(if (selectedFolderPath == "全部文件夹") "" else selectedFolderPath) }
     var selectedGalleryUris by remember { mutableStateOf<Set<Uri>>(emptySet()) }
     var showGallery by remember { mutableStateOf(false) }
     val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
@@ -90,21 +91,55 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
 
 
 
+    if (showFolderBrowser) {
+        val normalizedCurrent = browsingFolderPath.trimStart('/').let { if (it.isEmpty()) "" else if (it.endsWith("/")) it else "$it/" }
+        val childFolders = galleryGroups.mapNotNull { group ->
+            val path = group.path.trimStart('/')
+            if (!path.startsWith(normalizedCurrent)) null else {
+                val remainder = path.removePrefix(normalizedCurrent).trimEnd('/')
+                remainder.substringBefore('/').takeIf { it.isNotBlank() }
+            }
+        }.distinct().sorted()
+        AlertDialog(
+            onDismissRequest = { showFolderBrowser = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (normalizedCurrent.isNotEmpty()) TextButton(onClick = { browsingFolderPath = normalizedCurrent.trimEnd('/').substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" } }) { Text("上一级") }
+                    Text(if (normalizedCurrent.isEmpty()) "选择图片路径" else normalizedCurrent.trimEnd('/').substringAfterLast('/'))
+                }
+            },
+            text = {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(if (normalizedCurrent.isEmpty()) "根目录" else "/" + normalizedCurrent, color = Muted, fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    if (childFolders.isEmpty()) Text("当前目录没有包含图片的子文件夹。", color = Muted)
+                    else androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                        items(childFolders) { child ->
+                            Row(Modifier.fillMaxWidth().clickable { browsingFolderPath = normalizedCurrent + child + "/" }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("📁", modifier = Modifier.padding(end = 12.dp))
+                                Text(child, color = Ink, modifier = Modifier.weight(1f))
+                                Text("›", color = Muted, fontSize = 22.sp)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = {
+                selectedFolderPath = if (normalizedCurrent.isEmpty()) "全部文件夹" else normalizedCurrent
+                context.getSharedPreferences("qingtu_settings", android.content.Context.MODE_PRIVATE).edit().putString("batch_gallery_folder", selectedFolderPath).apply()
+                showFolderBrowser = false
+            }) { Text("确定") } },
+            dismissButton = { TextButton(onClick = { showFolderBrowser = false }) { Text("取消") } }
+        )
+    }
+
     if (showGallery) {
         AlertDialog(onDismissRequest = { showGallery = false },
             title = { Text("选择图片（已选 ${selectedGalleryUris.size} 张）") },
             text = {
                 Column(Modifier.fillMaxWidth()) {
-                    val folderOptions = listOf("全部文件夹") + galleryGroups.map { it.path }
-                    Box(Modifier.fillMaxWidth()) {
-                        OutlinedButton(onClick = { folderMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text(if (selectedFolderPath == "全部文件夹") "路径：全部文件夹" else "路径：" + selectedFolderPath) }
-                        DropdownMenu(expanded = folderMenuExpanded, onDismissRequest = { folderMenuExpanded = false }) {
-                            folderOptions.forEach { path -> DropdownMenuItem(text = { Text(if (path == "全部文件夹") path else path.trimEnd('/').substringAfterLast('/')) }, onClick = {
-                                selectedFolderPath = path
-                                context.getSharedPreferences("qingtu_settings", android.content.Context.MODE_PRIVATE).edit().putString("batch_gallery_folder", path).apply()
-                                folderMenuExpanded = false
-                            }) }
-                        }
+                    OutlinedButton(onClick = { browsingFolderPath = if (selectedFolderPath == "全部文件夹") "" else selectedFolderPath; showFolderBrowser = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (selectedFolderPath == "全部文件夹") "路径：全部文件夹（点击浏览目录）" else "路径：/" + selectedFolderPath)
                     }
                     val visibleGroups = if (selectedFolderPath == "全部文件夹") galleryGroups else galleryGroups.filter { it.path == selectedFolderPath }
                     if (visibleGroups.isEmpty()) Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) { Text("当前路径下没有图片", color = Muted) }
