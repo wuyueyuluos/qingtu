@@ -59,6 +59,7 @@ fun QingTuApp() {
     var showCompressor by remember { mutableStateOf(false) }
     var showConverter by remember { mutableStateOf(false) }
     var showResizer by remember { mutableStateOf(false) }
+    var showBatch by remember { mutableStateOf(false) }
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = DeepGreen, onPrimary = Color.White,
@@ -71,6 +72,8 @@ fun QingTuApp() {
             FormatConversionPage(onBack = { showConverter = false })
         } else if (showResizer) {
             ResizePage(onBack = { showResizer = false })
+        } else if (showBatch) {
+            BatchProcessingPage(onBack = { showBatch = false })
         } else {
             Scaffold(
                 containerColor = PageBg,
@@ -86,7 +89,7 @@ fun QingTuApp() {
                 }
             ) { padding ->
                 when (selectedTab) {
-                    0 -> HomePage(Modifier.padding(padding), onCompress = { showCompressor = true }, onConvert = { showConverter = true }, onResize = { showResizer = true })
+                    0 -> HomePage(Modifier.padding(padding), onCompress = { showCompressor = true }, onConvert = { showConverter = true }, onResize = { showResizer = true }, onBatch = { showBatch = true })
                     1 -> EmptyPage("处理记录", "完成的图片会保存在这里。")
                     else -> EmptyPage("设置", "默认保存位置、图片信息与外观设置将在这里提供。")
                 }
@@ -96,7 +99,7 @@ fun QingTuApp() {
 }
 
 @Composable
-private fun HomePage(modifier: Modifier = Modifier, onCompress: () -> Unit, onConvert: () -> Unit, onResize: () -> Unit) {
+private fun HomePage(modifier: Modifier = Modifier, onCompress: () -> Unit, onConvert: () -> Unit, onResize: () -> Unit, onBatch: () -> Unit) {
     Column(
         modifier = modifier.fillMaxSize().padding(horizontal = 22.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
@@ -125,7 +128,7 @@ private fun HomePage(modifier: Modifier = Modifier, onCompress: () -> Unit, onCo
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ToolCard("调整尺寸", "修改宽度和高度", Icons.Rounded.Tune, Modifier.weight(1f), onResize)
-                ToolCard("批量处理", "一次处理多张图片", Icons.Rounded.Image, Modifier.weight(1f)) {}
+                ToolCard("批量处理", "一次处理多张图片", Icons.Rounded.Image, Modifier.weight(1f), onBatch)
             }
         }
         Text("最近处理", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Ink)
