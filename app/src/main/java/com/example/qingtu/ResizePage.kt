@@ -155,20 +155,17 @@ internal fun ResizePage(onBack: () -> Unit) {
                     val result = withContext(Dispatchers.IO) {
                         try {
                             val resized = Bitmap.createScaledBitmap(input, w, h, true)
-                            val mime = if (resized.hasAlpha()) "image/png" else sourceMime
-                            val format = when {
-                                mime == "image/png" -> Bitmap.CompressFormat.PNG
-                                mime == "image/webp" -> Bitmap.CompressFormat.WEBP
-                                else -> Bitmap.CompressFormat.JPEG
-                            }
-                            val extension = when (format) { Bitmap.CompressFormat.PNG -> "png"; Bitmap.CompressFormat.WEBP -> "webp"; else -> "jpg" }
-                            val outputMime = when (format) { Bitmap.CompressFormat.PNG -> "image/png"; Bitmap.CompressFormat.WEBP -> "image/webp"; else -> "image/jpeg" }
+                            val originalName = sourceUri?.let { getImageDisplayName(context, it) } ?: "图片"
+                            val encodedFormat = imageFormatFromMime(sourceMime, originalName)
+                            val format = encodedFormat.format
+                            val extension = encodedFormat.extension
+                            val outputMime = encodedFormat.mime
                             val buffer = ByteArrayOutputStream()
                             if (!resized.compress(format, 95, buffer)) error("图片处理失败")
                             if (resized !== input) resized.recycle()
                             val bytes = buffer.toByteArray()
                             val values = ContentValues().apply {
-                                put(MediaStore.Images.Media.DISPLAY_NAME, "轻图_尺寸_${System.currentTimeMillis()}.$extension")
+                                put(MediaStore.Images.Media.DISPLAY_NAME, sourceUri?.let { outputImageName(context, it, extension) } ?: ("图片." + extension))
                                 put(MediaStore.Images.Media.MIME_TYPE, outputMime)
                                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/轻图")
                             }
