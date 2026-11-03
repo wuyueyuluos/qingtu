@@ -49,7 +49,6 @@ internal fun ResizePage(onBack: () -> Unit) {
     var widthText by remember { mutableStateOf("") }
     var heightText by remember { mutableStateOf("") }
     var keepRatio by remember { mutableStateOf(true) }
-    var editingWidth by remember { mutableStateOf(true) }
     var percent by remember { mutableFloatStateOf(100f) }
     var mode by remember { mutableStateOf("像素") }
     var busy by remember { mutableStateOf(false) }
@@ -117,11 +116,10 @@ internal fun ResizePage(onBack: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(value = widthText, onValueChange = { value ->
                     widthText = value.filter { it.isDigit() }.take(5)
-                    if (keepRatio && originalWidth > 0 && editingWidth) {
+                    if (keepRatio && originalWidth > 0) {
                         val w = widthText.toIntOrNull()
                         if (w != null) heightText = (w.toDouble() * originalHeight / originalWidth).toInt().coerceAtLeast(1).toString()
                     }
-                    editingWidth = true
                     savedSize = ""
                 }, label = { Text("宽度 (px)") }, modifier = Modifier.weight(1f), singleLine = true, enabled = source != null && !busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 OutlinedTextField(value = heightText, onValueChange = { value ->
@@ -130,7 +128,6 @@ internal fun ResizePage(onBack: () -> Unit) {
                         val h = heightText.toIntOrNull()
                         if (h != null) widthText = (h.toDouble() * originalWidth / originalHeight).toInt().coerceAtLeast(1).toString()
                     }
-                    editingWidth = false
                     savedSize = ""
                 }, label = { Text("高度 (px)") }, modifier = Modifier.weight(1f), singleLine = true, enabled = source != null && !busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             }
