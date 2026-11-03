@@ -58,7 +58,8 @@ private fun queryBatchGallery(context: android.content.Context): List<Uri> {
             result.add(Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cursor.getLong(idColumn).toString()))
         }
     }
-    return result\n}
+    return result
+}
 
 @Composable
 internal fun BatchProcessingPage(onBack: () -> Unit) {
@@ -255,7 +256,9 @@ internal fun BatchProcessingPage(onBack: () -> Unit) {
                                 success++
                             } catch (e: Exception) { errors.add("${index + 1}号图片：${e.message ?: "处理失败"}") }
                         }
-                        "处理完成：成功 $success / ${selected.size} 张。失败 ${errors.size} 张。" + if (errors.isEmpty()) "" else "\n" + errors.take(5).joinToString("\n")
+                        "处理完成：成功 $success / ${selected.size} 张。失败 ${errors.size} 张。" + if (errors.isEmpty()) "" else "
+" + errors.take(5).joinToString("
+")
                     }
                     result = summary
                     busy = false
