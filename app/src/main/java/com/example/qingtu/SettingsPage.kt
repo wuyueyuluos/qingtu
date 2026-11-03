@@ -18,10 +18,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 
-private val SettingsBg = Color(0xFFF6F7F3)
-private val SettingsGreen = Color(0xFF496B5B)
-private val SettingsInk = Color(0xFF26332C)
-private val SettingsMuted = Color(0xFF89938B)
+private val PageBg = Color(0xFFF6F7F3)
+private val DeepGreen = Color(0xFF496B5B)
+private val Ink = Color(0xFF26332C)
+private val Muted = Color(0xFF89938B)
 
 private const val SETTINGS_PREFS = "qingtu_settings"
 private const val KEY_APPEARANCE = "appearance"
@@ -61,7 +61,7 @@ internal fun SettingsPage() {
                     )
                 }
             }
-            Text("外观偏好已保存；全局深浅色适配将在后续步骤完成。", fontSize = 11.sp, color = SettingsMuted)
+            Text("外观会立即应用到整个应用。", fontSize = 11.sp, color = SettingsMuted)
         }
 
         SettingsCard {
@@ -74,7 +74,7 @@ internal fun SettingsPage() {
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Surface(color = Color(0xFFF1F4F0), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                 Text("Pictures/轻图/", modifier = Modifier.padding(14.dp), color = SettingsGreen, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
             Text("目前统一使用此目录，暂不支持自定义。", fontSize = 11.sp, color = SettingsMuted)
