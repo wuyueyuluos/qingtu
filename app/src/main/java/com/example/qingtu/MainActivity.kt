@@ -91,7 +91,7 @@ fun QingTuApp() {
                 when (selectedTab) {
                     0 -> HomePage(Modifier.padding(padding), onCompress = { showCompressor = true }, onConvert = { showConverter = true }, onResize = { showResizer = true }, onBatch = { showBatch = true })
                     1 -> ProcessingHistoryPage()
-                    else -> EmptyPage("设置", "默认保存位置、图片信息与外观设置将在这里提供。")
+                    else -> SettingsPage()
                 }
             }
         }
