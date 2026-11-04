@@ -356,7 +356,7 @@ internal fun GalleryWorkspacePage(
                                 if (pressed.size >= 2) {
                                     val zoomChange = event.calculateZoom()
                                     val panChange = event.calculatePan()
-                                    val centroid = event.calculateCentroid(useCurrent = true)
+                                    val centroid = event.calculateCentroid(useCurrent = false)
                                     val oldScale = scale
                                     val newScale = (oldScale * zoomChange).coerceIn(1f, 6.5f)
                                     val scaleFactor = newScale / oldScale
