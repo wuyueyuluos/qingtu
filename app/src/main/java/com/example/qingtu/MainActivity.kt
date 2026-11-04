@@ -61,53 +61,14 @@ fun QingTuApp() {
         "夜间模式" -> true
         else -> isSystemInDarkTheme()
     }
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var showCompressor by remember { mutableStateOf(false) }
-    var showConverter by remember { mutableStateOf(false) }
-    var showResizer by remember { mutableStateOf(false) }
-    var showBatch by remember { mutableStateOf(false) }
-    BackHandler(enabled = showCompressor || showConverter || showResizer || showBatch || selectedTab != 0) {
-        when {
-            showCompressor -> showCompressor = false
-            showConverter -> showConverter = false
-            showResizer -> showResizer = false
-            showBatch -> showBatch = false
-            selectedTab != 0 -> selectedTab = 0
-        }
-    }
     QingTuTheme(darkTheme = darkTheme) {
-        if (showCompressor) {
-            CompressionPage(onBack = { showCompressor = false })
-        } else if (showConverter) {
-            FormatConversionPage(onBack = { showConverter = false })
-        } else if (showResizer) {
-            ResizePage(onBack = { showResizer = false })
-        } else if (showBatch) {
-            BatchProcessingPage(onBack = { showBatch = false })
-        } else {
-            Scaffold(
-                containerColor = PageBg,
-                bottomBar = {
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                        NavigationBarItem(selected = selectedTab == 0, onClick = { selectedTab = 0 },
-                            icon = { Icon(Icons.Rounded.Image, null) }, label = { Text("首页") })
-                        NavigationBarItem(selected = selectedTab == 1, onClick = { selectedTab = 1 },
-                            icon = { Icon(Icons.Rounded.History, null) }, label = { Text("记录") })
-                        NavigationBarItem(selected = selectedTab == 2, onClick = { selectedTab = 2 },
-                            icon = { Icon(Icons.Rounded.Settings, null) }, label = { Text("设置") })
-                    }
-                }
-            ) { padding ->
-                when (selectedTab) {
-                    0 -> HomePage(Modifier.padding(padding), onCompress = { showCompressor = true }, onConvert = { showConverter = true }, onResize = { showResizer = true }, onBatch = { showBatch = true })
-                    1 -> ProcessingHistoryPage()
-                    else -> SettingsPage(appearance = appearance, onAppearanceChange = { selected ->
-                        appearance = selected
-                        prefs.edit().putString("appearance", selected).apply()
-                    })
-                }
+        GalleryWorkspacePage(
+            appearance = appearance,
+            onAppearanceChange = { selected ->
+                appearance = selected
+                prefs.edit().putString("appearance", selected).apply()
             }
-        }
+        )
     }
 }
 
