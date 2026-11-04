@@ -81,7 +81,7 @@ internal object ProcessingHistory {
         val array = JSONArray()
         all(context).filter { it.id != id }.forEach { r ->
             array.put(JSONObject().put("id", r.id).put("time", r.time).put("action", r.action)
-                .put("source", r.sourceName).put("output", r.outputName)
+                .put("source", r.sourceName).put("output", r.outputName).put("sourceUri", r.sourceUri)
                 .put("before", r.sourceBytes).put("after", r.outputBytes)
                 .put("details", r.details).put("outputUri", r.outputUri))
         }
