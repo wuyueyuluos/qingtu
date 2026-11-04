@@ -1,6 +1,9 @@
 package com.example.qingtu
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri as AndroidUri
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -12,7 +15,23 @@ import java.util.Locale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -100,6 +119,7 @@ internal fun ProcessingHistoryPage() {
     var records by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(ProcessingHistory.all(context)) }
     var confirmClear by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var pendingDelete by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<ProcessingRecord?>(null) }
+    var compareIndex by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(-1) }
     androidx.compose.foundation.layout.Column(
         modifier = androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background).padding(horizontal = 20.dp)
     ) {
@@ -130,8 +150,8 @@ internal fun ProcessingHistoryPage() {
                                 modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(top = 6.dp),
                                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
                             ) {
-                                androidx.compose.material3.TextButton(onClick = { ProcessingHistory.openOutput(context, r) }) {
-                                    androidx.compose.material3.Text("查看图片")
+                                androidx.compose.material3.TextButton(onClick = { compareIndex = index }) {
+                                    androidx.compose.material3.Text("对比查看")
                                 }
                                 androidx.compose.material3.TextButton(onClick = { pendingDelete = r }) {
                                     androidx.compose.material3.Text("删除记录", color = androidx.compose.material3.MaterialTheme.colorScheme.error)
@@ -144,6 +164,87 @@ internal fun ProcessingHistoryPage() {
             }
         }
     }
+
+    if (compareIndex in records.indices) {
+        val record = records[compareIndex]
+        Dialog(onDismissRequest = { compareIndex = -1 }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+            var original by androidx.compose.runtime.remember(record.id) { androidx.compose.runtime.mutableStateOf<Bitmap?>(null) }
+            var output by androidx.compose.runtime.remember(record.id) { androidx.compose.runtime.mutableStateOf<Bitmap?>(null) }
+            var scale by androidx.compose.runtime.remember(record.id) { androidx.compose.runtime.mutableFloatStateOf(1f) }
+            var offsetX by androidx.compose.runtime.remember(record.id) { androidx.compose.runtime.mutableFloatStateOf(0f) }
+            var offsetY by androidx.compose.runtime.remember(record.id) { androidx.compose.runtime.mutableFloatStateOf(0f) }
+            var loading by androidx.compose.runtime.remember(record.id) { androidx.compose.runtime.mutableStateOf(true) }
+            androidx.compose.runtime.LaunchedEffect(record.id) {
+                loading = true
+                val pair = withContext(Dispatchers.IO) {
+                    fun decode(value: String): Bitmap? = try {
+                        if (value.isBlank()) null else context.contentResolver.openInputStream(AndroidUri.parse(value))?.use { BitmapFactory.decodeStream(it) }
+                    } catch (_: Exception) { null }
+                    Pair(decode(record.sourceUri), decode(record.outputUri))
+                }
+                original = pair.first
+                output = pair.second
+                loading = false
+            }
+            androidx.compose.foundation.layout.Box(
+                Modifier.fillMaxSize().background(Color.Black)
+                    .pointerInput(record.id, compareIndex, records.size) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            var swipe = 0f
+                            var event = awaitPointerEvent()
+                            while (event.changes.any { it.pressed }) {
+                                val pressed = event.changes.filter { it.pressed }
+                                if (pressed.size >= 2) {
+                                    val centroid = event.calculateCentroid(useCurrent = false)
+                                    val zoom = event.calculateZoom()
+                                    val pan = event.calculatePan()
+                                    val nextScale = (scale * zoom).coerceIn(1f, 5f)
+                                    val factor = nextScale / scale
+                                    offsetX = centroid.x - size.width / 2f - (centroid.x - size.width / 2f - offsetX) * factor + pan.x
+                                    offsetY = centroid.y - size.height / 2f - (centroid.y - size.height / 2f - offsetY) * factor + pan.y
+                                    scale = nextScale
+                                    if (scale <= 1.01f) { scale = 1f; offsetX = 0f; offsetY = 0f }
+                                    swipe = 0f
+                                } else if (pressed.size == 1) {
+                                    val delta = pressed.first().positionChange()
+                                    if (scale > 1.01f) { offsetX += delta.x; offsetY += delta.y } else swipe += delta.x
+                                }
+                                event.changes.forEach { it.consume() }
+                                event = awaitPointerEvent()
+                            }
+                            if (scale <= 1.01f && kotlin.math.abs(swipe) > 90f) {
+                                val next = compareIndex + if (swipe < 0f) 1 else -1
+                                if (next in records.indices) compareIndex = next
+                            }
+                        }
+                    },
+                contentAlignment = androidx.compose.ui.Alignment.Center
+            ) {
+                if (original != null && output != null) {
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxSize().graphicsLayer {
+                        scaleX = scale; scaleY = scale; translationX = offsetX; translationY = offsetY
+                    }) {
+                        androidx.compose.foundation.layout.Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                            androidx.compose.material3.Text("原图", color = Color.White, fontSize = 14.sp, modifier = Modifier.padding(8.dp))
+                            Image(original!!.asImageBitmap(), null, Modifier.fillMaxWidth().weight(1f), contentScale = ContentScale.Fit)
+                        }
+                        androidx.compose.foundation.layout.Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                            androidx.compose.material3.Text("处理后", color = Color.White, fontSize = 14.sp, modifier = Modifier.padding(8.dp))
+                            Image(output!!.asImageBitmap(), null, Modifier.fillMaxWidth().weight(1f), contentScale = ContentScale.Fit)
+                        }
+                    }
+                } else {
+                    androidx.compose.material3.Text(if (loading) "正在加载图片…" else "原图无法读取（可能已失去访问权限）", color = Color.White)
+                }
+                androidx.compose.material3.TextButton(onClick = { compareIndex = -1 }, modifier = Modifier.align(androidx.compose.ui.Alignment.TopEnd).padding(8.dp)) {
+                    androidx.compose.material3.Text("关闭", color = Color.White)
+                }
+                androidx.compose.material3.Text("${compareIndex + 1} / ${records.size} · 左右滑动切换 · 双指缩放", color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(12.dp))
+            }
+        }
+    }
+
     if (pendingDelete != null) androidx.compose.material3.AlertDialog(
         onDismissRequest = { pendingDelete = null },
         title = { androidx.compose.material3.Text("删除这条记录？") },
