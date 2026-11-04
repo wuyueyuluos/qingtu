@@ -368,7 +368,7 @@ internal fun GalleryWorkspacePage(
                                         swipeDistance += delta.x
                                     }
                                 }
-                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                event.changes.forEach { it.consume() }
                                 event = awaitPointerEvent()
                             }
                             if (scale <= 1.01f && abs(swipeDistance) > 75f) {
