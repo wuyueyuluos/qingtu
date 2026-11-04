@@ -42,7 +42,7 @@ import androidx.compose.runtime.setValue
 
 internal data class ProcessingRecord(
     val id: Long, val time: Long, val action: String,
-    val sourceName: String, val outputName: String,
+    val sourceName: String, val outputName: String, val sourceUri: String,
     val sourceBytes: Long, val outputBytes: Long, val details: String, val outputUri: String
 )
 
@@ -56,7 +56,7 @@ internal object ProcessingHistory {
         return (0 until array.length()).mapNotNull { i ->
             val o = array.optJSONObject(i) ?: return@mapNotNull null
             ProcessingRecord(o.optLong("id"), o.optLong("time"), o.optString("action"),
-                o.optString("source"), o.optString("output"), o.optLong("before"),
+                o.optString("source"), o.optString("output"), o.optString("sourceUri"), o.optLong("before"),
                 o.optLong("after"), o.optString("details"), o.optString("outputUri"))
         }.sortedByDescending { it.time }
     }
@@ -67,11 +67,11 @@ internal object ProcessingHistory {
         val outputName = displayName(context, outputUri) ?: "处理后的图片"
         val records = all(context).toMutableList()
         records.add(0, ProcessingRecord(System.currentTimeMillis(), System.currentTimeMillis(),
-            action, sourceName, outputName, sourceBytes, outputBytes, details, outputUri.toString()))
+            action, sourceName, outputName, sourceUri?.toString() ?: "", sourceBytes, outputBytes, details, outputUri.toString()))
         val array = JSONArray()
         records.take(300).forEach { r ->
             array.put(JSONObject().put("id", r.id).put("time", r.time).put("action", r.action)
-                .put("source", r.sourceName).put("output", r.outputName)
+                .put("source", r.sourceName).put("output", r.outputName).put("sourceUri", r.sourceUri)
                 .put("before", r.sourceBytes).put("after", r.outputBytes).put("details", r.details).put("outputUri", r.outputUri))
         }
         prefs(context).edit().putString(KEY, array.toString()).apply()
