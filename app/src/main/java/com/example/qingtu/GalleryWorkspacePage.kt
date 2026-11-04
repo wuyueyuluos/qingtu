@@ -1,0 +1,441 @@
+package com.example.qingtu
+
+import android.Manifest
+import android.content.ContentValues
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color as AndroidColor
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.util.Size
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.ZoomIn
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+
+private data class GalleryFolder(val path: String, val images: List<Uri>)
+
+private fun loadGalleryFolders(context: Context): List<GalleryFolder> {
+    val map = linkedMapOf<String, MutableList<Uri>>()
+    val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.RELATIVE_PATH)
+    val sort = "${MediaStore.Images.Media.RELATIVE_PATH} ASC, ${MediaStore.Images.Media.DISPLAY_NAME} ASC"
+    context.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null, sort)?.use { c ->
+        val idCol = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+        val pathCol = c.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
+        while (c.moveToNext()) {
+            val path = if (pathCol >= 0) c.getString(pathCol) ?: "其他/" else "其他/"
+            val uri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, c.getLong(idCol).toString())
+            map.getOrPut(path) { mutableListOf() }.add(uri)
+        }
+    }
+    return map.map { GalleryFolder(it.key, it.value) }
+}
+
+@Composable
+internal fun GalleryWorkspacePage(
+    appearance: String,
+    onAppearanceChange: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var folders by remember { mutableStateOf<List<GalleryFolder>>(emptyList()) }
+    var currentPath by remember {
+        mutableStateOf(context.getSharedPreferences("qingtu_settings", Context.MODE_PRIVATE)
+            .getString("batch_gallery_folder", "全部文件夹") ?: "全部文件夹")
+    }
+    var browsingPath by remember { mutableStateOf("") }
+    var pathMode by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf<Set<Uri>>(emptySet()) }
+    var previewUri by remember { mutableStateOf<Uri?>(null) }
+    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var showSettings by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
+    var operation by remember { mutableStateOf("") }
+    var quality by remember { mutableFloatStateOf(80f) }
+    var targetFormat by remember { mutableStateOf("JPG") }
+    var resizePercent by remember { mutableFloatStateOf(80f) }
+    var busy by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    var showStatus by remember { mutableStateOf(false) }
+
+    val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
+    fun refreshGallery() {
+        scope.launch {
+            folders = withContext(Dispatchers.IO) { loadGalleryFolders(context) }
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) refreshGallery()
+        else { status = "需要允许轻图访问本地图片。"; showStatus = true }
+    }
+    LaunchedEffect(Unit) {
+        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) refreshGallery()
+        else permissionLauncher.launch(permission)
+    }
+
+    val normalizedPath = currentPath.trimStart('/').let { if (it.isBlank()) "" else if (it.endsWith("/")) it else "$it/" }
+    val visibleFolders = if (currentPath == "全部文件夹") folders else folders.filter { f ->
+        val p = f.path.trimStart('/')
+        p == normalizedPath.trimEnd('/') || p.startsWith(normalizedPath)
+    }
+    val visibleCount = visibleFolders.sumOf { it.images.size }
+
+    Box(Modifier.fillMaxSize().background(PageBg)) {
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("轻图", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                    Text(if (currentPath == "全部文件夹") "全部图片 · $visibleCount 张" else currentPath + " · $visibleCount 张",
+                        color = Muted, fontSize = 12.sp, maxLines = 1)
+                }
+                IconButton(onClick = { showSettings = true }) {
+                    Icon(Icons.Rounded.Settings, "设置", tint = DeepGreen, modifier = Modifier.size(25.dp))
+                }
+            }
+            if (selected.isNotEmpty() && !selectionMode) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("压缩", "转换格式", "调整尺寸").forEach { label ->
+                        FilledTonalButton(onClick = { operation = label }, modifier = Modifier.weight(1f)) { Text(label, fontSize = 12.sp) }
+                    }
+                }
+            }
+            if (folders.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("正在读取图片，或当前没有可访问的图片。", color = Muted)
+                }
+            } else if (visibleFolders.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("当前路径下没有图片", color = Muted) }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 110.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    visibleFolders.forEach { folder ->
+                        item(key = "header:${folder.path}") {
+                            Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(folder.path.trimEnd('/').substringAfterLast('/').ifBlank { "根目录" },
+                                    color = DeepGreen, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.width(8.dp))
+                                Text("${folder.images.size} 张", color = Muted, fontSize = 11.sp)
+                            }
+                        }
+                        items(folder.images.chunked(3), key = { row -> row.joinToString("|") }) { row ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                row.forEach { uri ->
+                                    var thumb by remember(uri) { mutableStateOf<Bitmap?>(null) }
+                                    LaunchedEffect(uri) {
+                                        thumb = withContext(Dispatchers.IO) {
+                                            try { context.contentResolver.loadThumbnail(uri, Size(320, 320), null) } catch (_: Exception) { null }
+                                        }
+                                    }
+                                    val isSelected = selected.contains(uri)
+                                    Box(
+                                        Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(9.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            .clickable {
+                                                if (selectionMode) selected = if (isSelected) selected - uri else selected + uri
+                                                else {
+                                                    previewUri = uri
+                                                    previewBitmap = null
+                                                }
+                                            }
+                                    ) {
+                                        if (thumb != null) Image(thumb!!.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                        if (selectionMode && isSelected) {
+                                            Box(Modifier.fillMaxSize().background(DeepGreen.copy(alpha = 0.32f)))
+                                            Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.align(Alignment.TopEnd).padding(7.dp).size(25.dp))
+                                        }
+                                    }
+                                }
+                                repeat(3 - row.size) { Spacer(Modifier.weight(1f).aspectRatio(1f)) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!pathMode && !selectionMode) {
+            Row(Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 22.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                FloatingActionButton(onClick = {
+                    browsingPath = if (currentPath == "全部文件夹") "" else currentPath
+                    pathMode = true
+                }, containerColor = SoftGreen, contentColor = DeepGreen) {
+                    Icon(Icons.Rounded.FolderOpen, "选择路径")
+                }
+                FloatingActionButton(onClick = { selected = emptySet(); selectionMode = true },
+                    containerColor = DeepGreen, contentColor = Color.White) {
+                    Icon(Icons.Rounded.Check, "选择图片")
+                }
+            }
+        }
+        if (pathMode || selectionMode) {
+            FloatingActionButton(
+                onClick = {
+                    if (pathMode) {
+                        currentPath = browsingPath.trim('/').let { if (it.isBlank()) "全部文件夹" else "$it/" }
+                        context.getSharedPreferences("qingtu_settings", Context.MODE_PRIVATE).edit().putString("batch_gallery_folder", currentPath).apply()
+                        pathMode = false
+                    } else {
+                        selectionMode = false
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 22.dp),
+                containerColor = DeepGreen, contentColor = Color.White
+            ) { Icon(Icons.Rounded.Check, "确定") }
+            TextButton(
+                onClick = {
+                    if (pathMode) pathMode = false else { selectionMode = false; selected = emptySet() }
+                },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 92.dp, bottom = 30.dp)
+            ) { Text("取消", color = DeepGreen) }
+        }
+    }
+
+    if (pathMode) {
+        val current = browsingPath.trimStart('/').let { if (it.isBlank()) "" else if (it.endsWith("/")) it else "$it/" }
+        val children = folders.mapNotNull { f ->
+            val p = f.path.trimStart('/')
+            if (!p.startsWith(current)) null else p.removePrefix(current).trimEnd('/').substringBefore('/').takeIf { it.isNotBlank() }
+        }.distinct().sorted()
+        AlertDialog(
+            onDismissRequest = { pathMode = false },
+            title = { Row(verticalAlignment = Alignment.CenterVertically) {
+                if (current.isNotEmpty()) TextButton(onClick = {
+                    browsingPath = current.trimEnd('/').substringBeforeLast('/', "").let { if (it.isBlank()) "" else "$it/" }
+                }) { Text("上一级") }
+                Text(if (current.isEmpty()) "选择图片路径" else current.trimEnd('/').substringAfterLast('/'))
+            } },
+            text = {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(if (current.isEmpty()) "根目录" else "/$current", color = Muted, fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    if (children.isEmpty()) Text("当前目录没有包含图片的子文件夹。", color = Muted)
+                    else LazyColumn(Modifier.heightIn(max = 350.dp)) {
+                        items(children) { child ->
+                            Row(Modifier.fillMaxWidth().clickable { browsingPath = current + child + "/" }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.FolderOpen, null, tint = DeepGreen)
+                                Spacer(Modifier.width(12.dp))
+                                Text(child, color = Ink, modifier = Modifier.weight(1f))
+                                Text("›", color = Muted, fontSize = 22.sp)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = {
+                browsingPath = current
+                currentPath = current.ifBlank { "全部文件夹" }
+                context.getSharedPreferences("qingtu_settings", Context.MODE_PRIVATE).edit().putString("batch_gallery_folder", currentPath).apply()
+                pathMode = false
+            }) { Text("确定") } },
+            dismissButton = { TextButton(onClick = { pathMode = false }) { Text("取消") } }
+        )
+    }
+
+    previewUri?.let { uri ->
+        Dialog(onDismissRequest = { previewUri = null; previewBitmap = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            var loading by remember(uri) { mutableStateOf(true) }
+            LaunchedEffect(uri) {
+                loading = true
+                previewBitmap = withContext(Dispatchers.IO) {
+                    try { context.contentResolver.loadThumbnail(uri, Size(1800, 1800), null) } catch (_: Exception) { null }
+                }
+                loading = false
+            }
+            Box(Modifier.fillMaxSize().background(Color.Black).clickable { previewUri = null; previewBitmap = null }, contentAlignment = Alignment.Center) {
+                if (previewBitmap != null) Image(previewBitmap!!.asImageBitmap(), null, Modifier.fillMaxSize().padding(8.dp), contentScale = ContentScale.Fit)
+                else Text(if (loading) "正在加载…" else "图片无法打开", color = Color.White)
+                TextButton(onClick = { previewUri = null; previewBitmap = null }, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) { Text("关闭", color = Color.White) }
+            }
+        }
+    }
+
+    if (showSettings) {
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            title = { Text("设置") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("外观", color = Ink, fontWeight = FontWeight.SemiBold)
+                    listOf("跟随系统", "日间模式", "夜间模式").forEach { option ->
+                        FilterChip(selected = appearance == option, onClick = { onAppearanceChange(option) }, label = { Text(option) })
+                    }
+                    OutlinedButton(onClick = { showSettings = false; showHistory = true }, modifier = Modifier.fillMaxWidth()) { Text("处理记录") }
+                    Text("处理后的图片保存到 Pictures/轻图/，原图不会被覆盖。", color = Muted, fontSize = 12.sp)
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSettings = false }) { Text("完成") } }
+        )
+    }
+    if (showHistory) {
+        Dialog(onDismissRequest = { showHistory = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Surface(Modifier.fillMaxSize(), color = PageBg) {
+                Column {
+                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("处理记录", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { showHistory = false }) { Text("关闭") }
+                    }
+                    ProcessingHistoryPage()
+                }
+            }
+        }
+    }
+
+    if (operation.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { if (!busy) operation = "" },
+            title = { Text(when(operation) { "压缩" -> "图片压缩"; "转换格式" -> "格式转换"; else -> "调整尺寸" }) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("已选择 ${selected.size} 张图片", color = Muted, fontSize = 12.sp)
+                    when(operation) {
+                        "压缩" -> {
+                            Text("压缩质量：${quality.toInt()}%", color = Ink)
+                            Slider(value = quality, onValueChange = { quality = it }, valueRange = 10f..100f, enabled = !busy)
+                            Text("保持每张图片原有格式。", color = Muted, fontSize = 12.sp)
+                        }
+                        "转换格式" -> {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("JPG", "PNG", "WebP").forEach { f ->
+                                    FilterChip(selected = targetFormat == f, onClick = { targetFormat = f }, label = { Text(f) }, enabled = !busy)
+                                }
+                            }
+                            if (targetFormat != "PNG") {
+                                Text("转换质量：${quality.toInt()}%", color = Ink)
+                                Slider(value = quality, onValueChange = { quality = it }, valueRange = 10f..100f, enabled = !busy)
+                            } else Text("PNG 为无损格式。", color = Muted, fontSize = 12.sp)
+                        }
+                        else -> {
+                            Text("缩放比例：${resizePercent.toInt()}%", color = Ink)
+                            Slider(value = resizePercent, onValueChange = { resizePercent = it }, valueRange = 10f..200f, enabled = !busy)
+                        }
+                    }
+                    if (busy) Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(10.dp)); Text("正在处理，请稍候…", color = Muted)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !busy && selected.isNotEmpty(), onClick = {
+                    val work = selected.toList()
+                    val op = operation
+                    val q = quality.toInt()
+                    val fmt = targetFormat
+                    val scale = resizePercent
+                    busy = true
+                    scope.launch {
+                        val summary = withContext(Dispatchers.IO) {
+                            var ok = 0
+                            val errors = mutableListOf<String>()
+                            work.forEachIndexed { index, uri ->
+                                try {
+                                    val resolver = context.contentResolver
+                                    val input = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } ?: error("无法读取图片")
+                                    val before = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
+                                    val mimeIn = resolver.getType(uri) ?: ""
+                                    val sourceFormat = imageFormatFromMime(mimeIn, getImageDisplayName(context, uri))
+                                    var outputBitmap: Bitmap = input
+                                    val encoded: EncodedImageFormat
+                                    when(op) {
+                                        "压缩" -> { encoded = sourceFormat }
+                                        "转换格式" -> {
+                                            encoded = when(fmt) {
+                                                "PNG" -> EncodedImageFormat(Bitmap.CompressFormat.PNG, "png", "image/png")
+                                                "WebP" -> EncodedImageFormat(Bitmap.CompressFormat.WEBP, "webp", "image/webp")
+                                                else -> EncodedImageFormat(Bitmap.CompressFormat.JPEG, "jpg", "image/jpeg")
+                                            }
+                                        }
+                                        else -> {
+                                            val w = (input.width * scale / 100f).toInt().coerceAtLeast(1)
+                                            val h = (input.height * scale / 100f).toInt().coerceAtLeast(1)
+                                            outputBitmap = Bitmap.createScaledBitmap(input, w, h, true)
+                                            encoded = sourceFormat
+                                        }
+                                    }
+                                    if (encoded.format == Bitmap.CompressFormat.JPEG && outputBitmap.hasAlpha()) {
+                                        val flattened = Bitmap.createBitmap(outputBitmap.width, outputBitmap.height, Bitmap.Config.ARGB_8888)
+                                        Canvas(flattened).apply { drawColor(AndroidColor.WHITE); drawBitmap(outputBitmap, 0f, 0f, null) }
+                                        if (outputBitmap !== input) outputBitmap.recycle()
+                                        outputBitmap = flattened
+                                    }
+                                    val bytes = ByteArrayOutputStream()
+                                    val qNow = if (encoded.format == Bitmap.CompressFormat.PNG) 100 else q
+                                    if (!outputBitmap.compress(encoded.format, qNow, bytes)) error("编码失败")
+                                    if (outputBitmap !== input) outputBitmap.recycle()
+                                    input.recycle()
+                                    val values = ContentValues().apply {
+                                        put(MediaStore.Images.Media.DISPLAY_NAME, outputImageName(context, uri, encoded.extension))
+                                        put(MediaStore.Images.Media.MIME_TYPE, encoded.mime)
+                                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/轻图")
+                                    }
+                                    val out = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: error("无法创建输出文件")
+                                    try { resolver.openOutputStream(out)?.use { it.write(bytes.toByteArray()) } ?: error("无法写入输出文件") }
+                                    catch (e: Exception) { resolver.delete(out, null, null); throw e }
+                                    val action = when(op) { "压缩" -> "图片压缩"; "转换格式" -> "格式转换"; else -> "调整尺寸" }
+                                    val detail = when(op) { "压缩" -> "质量 ${q}%"; "转换格式" -> "转为 ${fmt}"; else -> "${scale.toInt()}%" }
+                                    ProcessingHistory.add(context, action, uri, out, before, bytes.size().toLong(), detail)
+                                    ok++
+                                } catch (e: Exception) { errors.add("${index + 1}：${e.message ?: "处理失败"}") }
+                            }
+                            "完成：成功 $ok / ${work.size} 张，失败 ${errors.size} 张。" + if (errors.isEmpty()) "" else "\n" + errors.take(5).joinToString("\n")
+                        }
+                        busy = false
+                        operation = ""
+                        status = summary
+                        showStatus = true
+                        selected = emptySet()
+                    }
+                }) { Text(if (busy) "处理中" else "开始处理") }
+            },
+            dismissButton = { TextButton(enabled = !busy, onClick = { operation = "" }) { Text("取消") } }
+        )
+    }
+    if (showStatus) AlertDialog(
+        onDismissRequest = { showStatus = false },
+        title = { Text("处理结果") },
+        text = { Text(status) },
+        confirmButton = { TextButton(onClick = { showStatus = false }) { Text("知道了") } }
+    )
+}
