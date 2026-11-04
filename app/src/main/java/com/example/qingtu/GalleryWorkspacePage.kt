@@ -361,9 +361,15 @@ internal fun GalleryWorkspacePage(
                                     val newScale = (oldScale * zoomChange).coerceIn(1f, 6.5f)
                                     val scaleFactor = newScale / oldScale
 
-                                    // Keep the point between the fingers stationary while zooming.
-                                    offsetX = centroid.x - (centroid.x - offsetX) * scaleFactor + panChange.x
-                                    offsetY = centroid.y - (centroid.y - offsetY) * scaleFactor + panChange.y
+                                    // graphicsLayer scales around the viewport center by default.
+                                    // Convert the finger centroid to coordinates relative to that pivot
+                                    // before compensating the translation, so the touched image point stays fixed.
+                                    val pivotX = size.width / 2f
+                                    val pivotY = size.height / 2f
+                                    offsetX = (centroid.x - pivotX) -
+                                        (centroid.x - pivotX - offsetX) * scaleFactor + panChange.x
+                                    offsetY = (centroid.y - pivotY) -
+                                        (centroid.y - pivotY - offsetY) * scaleFactor + panChange.y
                                     scale = newScale
 
                                     if (bitmap != null && size.width > 0 && size.height > 0) {
