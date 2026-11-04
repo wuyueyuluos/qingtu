@@ -209,68 +209,58 @@ internal fun GalleryWorkspacePage(
                 }
             }
         }
-        if (pathMode || selectionMode) {
+        if (selectionMode) {
             FloatingActionButton(
-                onClick = {
-                    if (pathMode) {
-                        currentPath = browsingPath.trim('/').let { if (it.isBlank()) "全部文件夹" else "$it/" }
-                        context.getSharedPreferences("qingtu_settings", Context.MODE_PRIVATE).edit().putString("batch_gallery_folder", currentPath).apply()
-                        pathMode = false
-                    } else {
-                        selectionMode = false
-                    }
-                },
+                onClick = { selectionMode = false },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 22.dp),
                 containerColor = DeepGreen, contentColor = Color.White
             ) { Icon(Icons.Rounded.Check, "确定") }
-            TextButton(
-                onClick = {
-                    if (pathMode) pathMode = false else { selectionMode = false; selected = emptySet() }
-                },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 92.dp, bottom = 30.dp)
-            ) { Text("取消", color = DeepGreen) }
+            TextButton(onClick = { selectionMode = false; selected = emptySet() },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 92.dp, bottom = 30.dp)) {
+                Text("取消", color = DeepGreen)
+            }
         }
-    }
-
-    if (pathMode) {
-        val current = browsingPath.trimStart('/').let { if (it.isBlank()) "" else if (it.endsWith("/")) it else "$it/" }
-        val children = folders.mapNotNull { f ->
-            val p = f.path.trimStart('/')
-            if (!p.startsWith(current)) null else p.removePrefix(current).trimEnd('/').substringBefore('/').takeIf { it.isNotBlank() }
-        }.distinct().sorted()
-        AlertDialog(
-            onDismissRequest = { pathMode = false },
-            title = { Row(verticalAlignment = Alignment.CenterVertically) {
-                if (current.isNotEmpty()) TextButton(onClick = {
-                    browsingPath = current.trimEnd('/').substringBeforeLast('/', "").let { if (it.isBlank()) "" else "$it/" }
-                }) { Text("上一级") }
-                Text(if (current.isEmpty()) "选择图片路径" else current.trimEnd('/').substringAfterLast('/'))
-            } },
-            text = {
-                Column(Modifier.fillMaxWidth()) {
-                    Text(if (current.isEmpty()) "根目录" else "/$current", color = Muted, fontSize = 12.sp)
-                    Spacer(Modifier.height(8.dp))
-                    if (children.isEmpty()) Text("当前目录没有包含图片的子文件夹。", color = Muted)
-                    else LazyColumn(Modifier.heightIn(max = 350.dp)) {
+        if (pathMode) {
+            val current = browsingPath.trimStart('/').let { if (it.isBlank()) "" else if (it.endsWith("/")) it else "$it/" }
+            val children = folders.mapNotNull { f ->
+                val p = f.path.trimStart('/')
+                if (!p.startsWith(current)) null else p.removePrefix(current).trimEnd('/').substringBefore('/').takeIf { it.isNotBlank() }
+            }.distinct().sorted()
+            Box(Modifier.fillMaxSize().background(PageBg)) {
+                Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("选择图片路径", color = Ink, fontSize = 23.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { pathMode = false }) { Text("取消") }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (current.isEmpty()) "/" else "/$current", color = DeepGreen, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        if (current.isNotEmpty()) TextButton(onClick = {
+                            browsingPath = current.trimEnd('/').substringBeforeLast('/', "").let { if (it.isBlank()) "" else "$it/" }
+                        }) { Text("上一级") }
+                    }
+                    if (children.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("当前目录没有包含图片的子文件夹。", color = Muted)
+                    } else LazyColumn(contentPadding = PaddingValues(bottom = 100.dp)) {
                         items(children) { child ->
-                            Row(Modifier.fillMaxWidth().clickable { browsingPath = current + child + "/" }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.fillMaxWidth().clickable { browsingPath = current + child + "/" }.padding(vertical = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Rounded.FolderOpen, null, tint = DeepGreen)
-                                Spacer(Modifier.width(12.dp))
-                                Text(child, color = Ink, modifier = Modifier.weight(1f))
-                                Text("›", color = Muted, fontSize = 22.sp)
+                                Spacer(Modifier.width(14.dp))
+                                Text(child, color = Ink, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                                Text("›", color = Muted, fontSize = 24.sp)
                             }
+                            Divider(color = MaterialTheme.colorScheme.surfaceVariant)
                         }
                     }
                 }
-            },
-            confirmButton = { TextButton(onClick = {
-                browsingPath = current
-                currentPath = current.ifBlank { "全部文件夹" }
-                context.getSharedPreferences("qingtu_settings", Context.MODE_PRIVATE).edit().putString("batch_gallery_folder", currentPath).apply()
-                pathMode = false
-            }) { Text("确定") } },
-            dismissButton = { TextButton(onClick = { pathMode = false }) { Text("取消") } }
-        )
+                FloatingActionButton(onClick = {
+                    currentPath = current.ifBlank { "全部文件夹" }
+                    context.getSharedPreferences("qingtu_settings", Context.MODE_PRIVATE).edit().putString("batch_gallery_folder", currentPath).apply()
+                    pathMode = false
+                }, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 22.dp),
+                    containerColor = DeepGreen, contentColor = Color.White) { Icon(Icons.Rounded.Check, "确定") }
+            }
+        }
     }
 
     previewUri?.let { uri ->
