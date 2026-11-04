@@ -34,6 +34,15 @@ import androidx.compose.material.icons.rounded.ZoomIn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.awaitEachGesture
+import androidx.compose.ui.input.pointer.awaitFirstDown
+import androidx.compose.ui.input.pointer.calculatePan
+import androidx.compose.ui.input.pointer.calculateZoom
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.consume
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -49,6 +58,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 import java.io.ByteArrayOutputStream
 
 private data class GalleryFolder(val path: String, val images: List<Uri>)
@@ -86,6 +96,8 @@ internal fun GalleryWorkspacePage(
     var selectionMode by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Set<Uri>>(emptySet()) }
     var previewUri by remember { mutableStateOf<Uri?>(null) }
+    var previewImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var previewIndex by remember { mutableIntStateOf(0) }
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
@@ -209,6 +221,8 @@ internal fun GalleryWorkspacePage(
                                             .clickable {
                                                 if (selectionMode) selected = if (isSelected) selected - uri else selected + uri
                                                 else {
+                                                    previewImages = visibleFolders.flatMap { it.images }
+                                                    previewIndex = previewImages.indexOf(uri).coerceAtLeast(0)
                                                     previewUri = uri
                                                     previewBitmap = null
                                                 }
@@ -298,8 +312,14 @@ internal fun GalleryWorkspacePage(
     }
 
     previewUri?.let { uri ->
-        Dialog(onDismissRequest = { previewUri = null; previewBitmap = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Dialog(
+            onDismissRequest = { previewUri = null; previewBitmap = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+        ) {
             var loading by remember(uri) { mutableStateOf(true) }
+            var scale by remember(uri) { mutableFloatStateOf(1f) }
+            var offsetX by remember(uri) { mutableFloatStateOf(0f) }
+            var offsetY by remember(uri) { mutableFloatStateOf(0f) }
             LaunchedEffect(uri) {
                 loading = true
                 previewBitmap = withContext(Dispatchers.IO) {
@@ -321,10 +341,81 @@ internal fun GalleryWorkspacePage(
                 }
                 loading = false
             }
-            Box(Modifier.fillMaxSize().background(Color.Black).clickable { previewUri = null; previewBitmap = null }, contentAlignment = Alignment.Center) {
-                if (previewBitmap != null) Image(previewBitmap!!.asImageBitmap(), null, Modifier.fillMaxSize().padding(8.dp), contentScale = ContentScale.Fit)
-                else Text(if (loading) "正在加载…" else "图片无法打开", color = Color.White)
-                TextButton(onClick = { previewUri = null; previewBitmap = null }, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) { Text("关闭", color = Color.White) }
+            Box(
+                Modifier.fillMaxSize()
+                    .background(Color.Black)
+                    .pointerInput(uri, scale) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            var swipeDistance = 0f
+                            var event = awaitPointerEvent()
+                            while (event.changes.any { it.pressed }) {
+                                val pressed = event.changes.filter { it.pressed }
+                                if (pressed.size >= 2) {
+                                    val zoomChange = event.calculateZoom()
+                                    val panChange = event.calculatePan()
+                                    scale = (scale * zoomChange).coerceIn(1f, 5f)
+                                    if (scale > 1f) {
+                                        offsetX += panChange.x
+                                        offsetY += panChange.y
+                                    }
+                                    swipeDistance = 0f
+                                } else if (pressed.size == 1) {
+                                    val delta = pressed.first().positionChange()
+                                    if (scale > 1.01f) {
+                                        offsetX += delta.x
+                                        offsetY += delta.y
+                                    } else {
+                                        swipeDistance += delta.x
+                                    }
+                                }
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                event = awaitPointerEvent()
+                            }
+                            if (scale <= 1.01f && abs(swipeDistance) > 75f) {
+                                val next = if (swipeDistance < 0f) previewIndex + 1 else previewIndex - 1
+                                if (next in previewImages.indices) {
+                                    previewIndex = next
+                                    previewUri = previewImages[next]
+                                    previewBitmap = null
+                                }
+                            }
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (previewBitmap != null) {
+                    Image(
+                        previewBitmap!!.asImageBitmap(),
+                        contentDescription = "图片预览",
+                        modifier = Modifier.fillMaxSize().graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offsetX
+                            translationY = offsetY
+                        },
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Text(if (loading) "正在加载…" else "图片无法打开", color = Color.White)
+                }
+                Row(
+                    Modifier.align(Alignment.TopStart).fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.38f))
+                        .padding(start = 8.dp, end = 18.dp, top = 10.dp, bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { previewUri = null; previewBitmap = null }) {
+                        Icon(Icons.Rounded.ArrowBack, "返回", tint = Color.White)
+                    }
+                    Text(
+                        "${previewIndex + 1} / ${previewImages.size}",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text("左右滑动切换 · 双指缩放", color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp)
+                }
             }
         }
     }
