@@ -7,6 +7,7 @@ import android.net.Uri as AndroidUri
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.provider.MediaStore
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -180,7 +181,20 @@ internal fun ProcessingHistoryPage() {
                     fun decode(value: String): Bitmap? = try {
                         if (value.isBlank()) null else context.contentResolver.openInputStream(AndroidUri.parse(value))?.use { BitmapFactory.decodeStream(it) }
                     } catch (_: Exception) { null }
-                    Pair(decode(record.sourceUri), decode(record.outputUri))
+                    var before = decode(record.sourceUri)
+                    // Older records did not store the original URI; try the saved filename.
+                    if (before == null) {
+                        val projection = arrayOf(MediaStore.Images.Media._ID)
+                        context.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection,
+                            MediaStore.Images.Media.DISPLAY_NAME + "=?", arrayOf(record.sourceName), null)?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val found = AndroidUri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                                    cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)).toString())
+                                before = decode(found.toString())
+                            }
+                        }
+                    }
+                    Pair(before, decode(record.outputUri))
                 }
                 original = pair.first
                 output = pair.second
