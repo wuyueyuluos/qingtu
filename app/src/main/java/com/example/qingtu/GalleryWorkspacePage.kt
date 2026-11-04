@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.ZoomIn
@@ -172,6 +173,9 @@ internal fun GalleryWorkspacePage(
                     Text("轻图", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
                     Text(if (currentPath == "全部文件夹") "全部图片 · $visibleCount 张" else currentPath + " · $visibleCount 张",
                         color = Muted, fontSize = 12.sp, maxLines = 1)
+                }
+                IconButton(onClick = { showHistory = true }) {
+                    Icon(Icons.Rounded.History, "处理记录", tint = DeepGreen, modifier = Modifier.size(25.dp))
                 }
                 IconButton(onClick = { showSettings = true }) {
                     Icon(Icons.Rounded.Settings, "设置", tint = DeepGreen, modifier = Modifier.size(25.dp))
@@ -442,23 +446,6 @@ internal fun GalleryWorkspacePage(
                 } else {
                     Text(if (loading) "正在加载…" else "图片无法打开", color = Color.White)
                 }
-                Row(
-                    Modifier.align(Alignment.TopStart).fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.38f))
-                        .padding(start = 8.dp, end = 18.dp, top = 10.dp, bottom = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { previewUri = null; previewBitmap = null }) {
-                        Icon(Icons.Rounded.ArrowBack, "返回", tint = Color.White)
-                    }
-                    Text(
-                        "${previewIndex + 1} / ${previewImages.size}",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text("左右滑动切换 · 双指缩放", color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp)
-                }
             }
         }
     }
@@ -473,7 +460,6 @@ internal fun GalleryWorkspacePage(
                     listOf("跟随系统", "日间模式", "夜间模式").forEach { option ->
                         FilterChip(selected = appearance == option, onClick = { onAppearanceChange(option) }, label = { Text(option) })
                     }
-                    OutlinedButton(onClick = { showSettings = false; showHistory = true }, modifier = Modifier.fillMaxWidth()) { Text("处理记录") }
                     Text("处理后的图片保存到 Pictures/轻图/，原图不会被覆盖。", color = Muted, fontSize = 12.sp)
                 }
             },
