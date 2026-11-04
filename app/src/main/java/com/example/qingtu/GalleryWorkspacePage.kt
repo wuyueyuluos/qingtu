@@ -181,7 +181,7 @@ internal fun GalleryWorkspacePage(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 110.dp),
+                    contentPadding = PaddingValues(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 110.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     visibleFolders.forEach { folder ->
@@ -193,8 +193,8 @@ internal fun GalleryWorkspacePage(
                                 Text("${folder.images.size} 张", color = Muted, fontSize = 11.sp)
                             }
                         }
-                        items(folder.images.chunked(3), key = { row -> row.joinToString("|") }) { row ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        items(folder.images.chunked(4), key = { row -> row.joinToString("|") }) { row ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                                 row.forEach { uri ->
                                     var thumb by remember(uri) { mutableStateOf<Bitmap?>(null) }
                                     LaunchedEffect(uri) {
@@ -221,7 +221,7 @@ internal fun GalleryWorkspacePage(
                                         }
                                     }
                                 }
-                                repeat(3 - row.size) { Spacer(Modifier.weight(1f).aspectRatio(1f)) }
+                                repeat(4 - row.size) { Spacer(Modifier.weight(1f).aspectRatio(1f)) }
                             }
                         }
                     }
@@ -303,7 +303,21 @@ internal fun GalleryWorkspacePage(
             LaunchedEffect(uri) {
                 loading = true
                 previewBitmap = withContext(Dispatchers.IO) {
-                    try { context.contentResolver.loadThumbnail(uri, Size(1800, 1800), null) } catch (_: Exception) { null }
+                    try {
+                        val resolver = context.contentResolver
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) null else {
+                            val metrics = context.resources.displayMetrics
+                            val targetWidth = metrics.widthPixels * 2
+                            val targetHeight = metrics.heightPixels * 2
+                            var sample = 1
+                            while (bounds.outWidth / (sample * 2) >= targetWidth &&
+                                bounds.outHeight / (sample * 2) >= targetHeight) sample *= 2
+                            val options = BitmapFactory.Options().apply { inSampleSize = sample }
+                            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+                        }
+                    } catch (_: Exception) { null }
                 }
                 loading = false
             }
