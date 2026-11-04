@@ -343,27 +343,61 @@ internal fun GalleryWorkspacePage(
             Box(
                 Modifier.fillMaxSize()
                     .background(Color.Black)
-                    .pointerInput(uri, scale) {
+                    .pointerInput(uri) {
                         awaitEachGesture {
                             awaitFirstDown(requireUnconsumed = false)
                             var swipeDistance = 0f
+                            var edgeSwipeDistance = 0f
                             var event = awaitPointerEvent()
                             while (event.changes.any { it.pressed }) {
                                 val pressed = event.changes.filter { it.pressed }
+                                val bitmap = previewBitmap
                                 if (pressed.size >= 2) {
                                     val zoomChange = event.calculateZoom()
                                     val panChange = event.calculatePan()
-                                    scale = (scale * zoomChange).coerceIn(1f, 5f)
-                                    if (scale > 1f) {
-                                        offsetX += panChange.x
-                                        offsetY += panChange.y
+                                    val centroid = event.calculateCentroid(useCurrent = true)
+                                    val oldScale = scale
+                                    val newScale = (oldScale * zoomChange).coerceIn(1f, 6.5f)
+                                    val scaleFactor = newScale / oldScale
+
+                                    // Keep the point between the fingers stationary while zooming.
+                                    offsetX = centroid.x - (centroid.x - offsetX) * scaleFactor + panChange.x
+                                    offsetY = centroid.y - (centroid.y - offsetY) * scaleFactor + panChange.y
+                                    scale = newScale
+
+                                    if (bitmap != null && size.width > 0 && size.height > 0) {
+                                        val fit = minOf(
+                                            size.width.toFloat() / bitmap.width,
+                                            size.height.toFloat() / bitmap.height
+                                        )
+                                        val maxX = ((bitmap.width * fit * newScale - size.width) / 2f).coerceAtLeast(0f)
+                                        val maxY = ((bitmap.height * fit * newScale - size.height) / 2f).coerceAtLeast(0f)
+                                        offsetX = offsetX.coerceIn(-maxX, maxX)
+                                        offsetY = offsetY.coerceIn(-maxY, maxY)
+                                    }
+                                    if (newScale <= 1.01f) {
+                                        scale = 1f
+                                        offsetX = 0f
+                                        offsetY = 0f
                                     }
                                     swipeDistance = 0f
+                                    edgeSwipeDistance = 0f
                                 } else if (pressed.size == 1) {
                                     val delta = pressed.first().positionChange()
-                                    if (scale > 1.01f) {
-                                        offsetX += delta.x
-                                        offsetY += delta.y
+                                    if (scale > 1.01f && bitmap != null && size.width > 0 && size.height > 0) {
+                                        val fit = minOf(
+                                            size.width.toFloat() / bitmap.width,
+                                            size.height.toFloat() / bitmap.height
+                                        )
+                                        val maxX = ((bitmap.width * fit * scale - size.width) / 2f).coerceAtLeast(0f)
+                                        val maxY = ((bitmap.height * fit * scale - size.height) / 2f).coerceAtLeast(0f)
+                                        val oldX = offsetX
+                                        val oldY = offsetY
+                                        offsetX = (offsetX + delta.x).coerceIn(-maxX, maxX)
+                                        offsetY = (offsetY + delta.y).coerceIn(-maxY, maxY)
+
+                                        // Only the movement that cannot pan the image is treated as an edge swipe.
+                                        edgeSwipeDistance += delta.x - (offsetX - oldX)
                                     } else {
                                         swipeDistance += delta.x
                                     }
@@ -371,8 +405,10 @@ internal fun GalleryWorkspacePage(
                                 event.changes.forEach { it.consume() }
                                 event = awaitPointerEvent()
                             }
-                            if (scale <= 1.01f && abs(swipeDistance) > 75f) {
-                                val next = if (swipeDistance < 0f) previewIndex + 1 else previewIndex - 1
+
+                            val switchDistance = if (scale > 1.01f) edgeSwipeDistance else swipeDistance
+                            if (abs(switchDistance) > 85f) {
+                                val next = if (switchDistance < 0f) previewIndex + 1 else previewIndex - 1
                                 if (next in previewImages.indices) {
                                     previewIndex = next
                                     previewUri = previewImages[next]
@@ -381,6 +417,7 @@ internal fun GalleryWorkspacePage(
                             }
                         }
                     },
+
                 contentAlignment = Alignment.Center
             ) {
                 if (previewBitmap != null) {
