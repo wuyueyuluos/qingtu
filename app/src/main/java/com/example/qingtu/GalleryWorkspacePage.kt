@@ -1,6 +1,8 @@
 package com.example.qingtu
 
 import android.Manifest
+import android.app.Activity
+import android.widget.Toast
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
@@ -12,6 +14,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Size
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -93,6 +96,37 @@ internal fun GalleryWorkspacePage(
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     var showStatus by remember { mutableStateOf(false) }
+    var lastBackPressedAt by remember { mutableLongStateOf(0L) }
+
+    BackHandler {
+        when {
+            pathMode -> {
+                val path = browsingPath.trim('/')
+                if (path.isBlank()) {
+                    pathMode = false
+                } else {
+                    val parent = path.substringBeforeLast('/', "")
+                    browsingPath = if (parent.isBlank()) "" else "$parent/"
+                }
+            }
+            selectionMode && selected.isNotEmpty() -> {
+                selected = emptySet()
+            }
+            selectionMode -> {
+                selectionMode = false
+                selected = emptySet()
+            }
+            else -> {
+                val now = System.currentTimeMillis()
+                if (now - lastBackPressedAt <= 2000L) {
+                    (context as? Activity)?.finish()
+                } else {
+                    lastBackPressedAt = now
+                    Toast.makeText(context, "再按一次返回键退出轻图", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
     fun refreshGallery() {
