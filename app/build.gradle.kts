@@ -18,7 +18,14 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // 启用 R8，移除未使用代码并优化字节码。
+            isMinifyEnabled = true
+            // 同时移除未使用的 Android 资源。
+            isShrinkResources = true
+            // 使用 debug 签名，便于从 GitHub Actions 下载后直接安装。
+            // CI 每次运行的 debug 密钥可能不同，更新安装时仍可能需要先卸载旧版。
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
         }
     }
 
@@ -34,6 +41,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // 保留现有图标依赖，由 R8 在 Release 构建中裁剪未使用的图标代码。
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
