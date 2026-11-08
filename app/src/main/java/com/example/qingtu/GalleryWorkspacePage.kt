@@ -94,7 +94,10 @@ private fun loadGalleryFolders(context: Context, sortMode: String, ascending: Bo
             compareBy<GalleryFolder> { it.latestModified * if (ascending) 1L else -1L }
                 .thenBy { it.path }
         )
-    } else folders
+    } else {
+        if (ascending) folders.sortedBy { it.path }
+        else folders.sortedByDescending { it.path }
+    }
 }
 
 @Composable
