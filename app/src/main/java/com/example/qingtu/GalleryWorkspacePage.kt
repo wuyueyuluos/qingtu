@@ -559,16 +559,16 @@ internal fun GalleryWorkspacePage(
             if (showImageInfo) {
                 Column(
                     Modifier.align(Alignment.TopCenter).fillMaxWidth()
-                        .padding(start = 24.dp, end = 24.dp, top = 70.dp)
+                        .padding(start = 12.dp, end = 12.dp, top = 70.dp)
                         .clip(RoundedCornerShape(18.dp))
                         .background(Color.Black.copy(alpha = 0.56f))
-                        .padding(horizontal = 18.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Text(imageName, color = Color.White, fontSize = 16.sp, maxLines = 1,
+                    Text(imageName, color = Color.White, fontSize = 14.sp, maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                    Text("$imageDimensions  $imageSize", color = Color.White.copy(alpha = 0.92f), fontSize = 16.sp)
-                    Text(imageModified, color = Color.White.copy(alpha = 0.92f), fontSize = 16.sp)
+                    Text("$imageDimensions  $imageSize", color = Color.White.copy(alpha = 0.92f), fontSize = 14.sp)
+                    Text(imageModified, color = Color.White.copy(alpha = 0.92f), fontSize = 14.sp)
                 }
             }
             }
