@@ -62,24 +62,39 @@ import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import java.io.ByteArrayOutputStream
 
-private data class GalleryFolder(val path: String, val images: List<Uri>)
+private data class GalleryFolder(val path: String, val images: List<Uri>, val latestModified: Long = 0L)
 
 private fun loadGalleryFolders(context: Context, sortMode: String, ascending: Boolean): List<GalleryFolder> {
-    val map = linkedMapOf<String, MutableList<Uri>>()
-    val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.RELATIVE_PATH)
-    val sortColumn = if (sortMode == "date") MediaStore.Images.Media.DATE_ADDED else MediaStore.Images.Media.DISPLAY_NAME
+    val map = linkedMapOf<String, MutableList<Pair<Uri, Long>>>()
+    val projection = arrayOf(
+        MediaStore.Images.Media._ID,
+        MediaStore.Images.Media.RELATIVE_PATH,
+        MediaStore.Images.Media.DATE_MODIFIED
+    )
     val direction = if (ascending) "ASC" else "DESC"
+    val sortColumn = if (sortMode == "date") MediaStore.Images.Media.DATE_MODIFIED else MediaStore.Images.Media.DISPLAY_NAME
     val sort = "${MediaStore.Images.Media.RELATIVE_PATH} ASC, $sortColumn $direction, ${MediaStore.Images.Media.DISPLAY_NAME} ASC"
     context.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null, sort)?.use { c ->
         val idCol = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
         val pathCol = c.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
+        val modifiedCol = c.getColumnIndex(MediaStore.Images.Media.DATE_MODIFIED)
         while (c.moveToNext()) {
             val path = if (pathCol >= 0) c.getString(pathCol) ?: "其他/" else "其他/"
             val uri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, c.getLong(idCol).toString())
-            map.getOrPut(path) { mutableListOf() }.add(uri)
+            val modified = if (modifiedCol >= 0) c.getLong(modifiedCol) else 0L
+            map.getOrPut(path) { mutableListOf() }.add(uri to modified)
         }
     }
-    return map.map { GalleryFolder(it.key, it.value) }
+
+    val folders = map.map { (path, entries) ->
+        GalleryFolder(path, entries.map { it.first }, entries.maxOfOrNull { it.second } ?: 0L)
+    }
+    return if (sortMode == "date") {
+        folders.sortedWith(
+            compareBy<GalleryFolder> { it.latestModified * if (ascending) 1L else -1L }
+                .thenBy { it.path }
+        )
+    } else folders
 }
 
 @Composable
