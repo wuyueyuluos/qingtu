@@ -550,6 +550,7 @@ internal fun GalleryWorkspacePage(
                     Text(if (loading) "正在加载…" else "图片无法打开", color = Color.White)
                 }
             }
+            Box(Modifier.fillMaxSize()) {
             IconButton(onClick = { showImageInfo = !showImageInfo },
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 14.dp)
                     .size(44.dp).background(Color.Black.copy(alpha = 0.28f), CircleShape)) {
@@ -569,6 +570,7 @@ internal fun GalleryWorkspacePage(
                     Text("$imageDimensions  $imageSize", color = Color.White.copy(alpha = 0.92f), fontSize = 16.sp)
                     Text(imageModified, color = Color.White.copy(alpha = 0.92f), fontSize = 16.sp)
                 }
+            }
             }
         }
     }
