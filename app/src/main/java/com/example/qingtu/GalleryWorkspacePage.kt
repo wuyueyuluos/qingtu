@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.ZoomIn
@@ -315,7 +316,18 @@ internal fun GalleryWorkspacePage(
         }
 
         if (!pathMode && !selectionMode) {
-            Row(Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 22.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(
+                Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 22.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                SmallFloatingActionButton(
+                    onClick = { refreshGallery() },
+                    containerColor = SoftGreen,
+                    contentColor = DeepGreen
+                ) {
+                    Icon(Icons.Rounded.Refresh, "刷新")
+                }
                 FloatingActionButton(onClick = {
                     browsingPath = if (currentPath == "全部文件夹") "" else currentPath
                     pathMode = true
