@@ -13,6 +13,7 @@ import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.util.Size
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
@@ -64,6 +66,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private data class GalleryFolder(val path: String, val images: List<Uri>, val latestModified: Long = 0L)
 
@@ -385,11 +390,45 @@ internal fun GalleryWorkspacePage(
             properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
         ) {
             var loading by remember(uri) { mutableStateOf(true) }
+            var showImageInfo by remember(uri) { mutableStateOf(false) }
+            var imageName by remember(uri) { mutableStateOf("正在读取…") }
+            var imageSize by remember(uri) { mutableStateOf("大小未知") }
+            var imageDimensions by remember(uri) { mutableStateOf("尺寸未知") }
+            var imageModified by remember(uri) { mutableStateOf("未知") }
             var scale by remember(uri) { mutableFloatStateOf(1f) }
             var offsetX by remember(uri) { mutableFloatStateOf(0f) }
             var offsetY by remember(uri) { mutableFloatStateOf(0f) }
             LaunchedEffect(uri) {
                 loading = true
+                val metadata = withContext(Dispatchers.IO) {
+                    try {
+                        var name = uri.lastPathSegment?.substringAfterLast('/') ?: "未知图片"
+                        var size = 0L
+                        var width = 0
+                        var height = 0
+                        var modified = 0L
+                        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE, MediaStore.Images.Media.WIDTH, MediaStore.Images.Media.HEIGHT, MediaStore.Images.Media.DATE_MODIFIED), null, null, null)?.use { c ->
+                            if (c.moveToFirst()) {
+                                val n = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                                val z = c.getColumnIndex(OpenableColumns.SIZE)
+                                val w = c.getColumnIndex(MediaStore.Images.Media.WIDTH)
+                                val h = c.getColumnIndex(MediaStore.Images.Media.HEIGHT)
+                                val d = c.getColumnIndex(MediaStore.Images.Media.DATE_MODIFIED)
+                                if (n >= 0) name = c.getString(n) ?: name
+                                if (z >= 0 && !c.isNull(z)) size = c.getLong(z)
+                                if (w >= 0 && !c.isNull(w)) width = c.getInt(w)
+                                if (h >= 0 && !c.isNull(h)) height = c.getInt(h)
+                                if (d >= 0 && !c.isNull(d)) modified = c.getLong(d)
+                            }
+                        }
+                        val date = if (modified > 0L) SimpleDateFormat("yyyy年M月d日 HH:mm", Locale.getDefault()).format(Date(modified * 1000L)) else "未知"
+                        arrayOf(name, size.toString(), "${width}×${height}", date)
+                    } catch (_: Exception) { arrayOf("未知图片", "0", "尺寸未知", "未知") }
+                }
+                imageName = metadata[0]
+                imageSize = if (metadata[1].toLong() > 0L) android.text.format.Formatter.formatShortFileSize(context, metadata[1].toLong()) else "大小未知"
+                imageDimensions = metadata[2].takeIf { it != "0×0" } ?: "尺寸未知"
+                imageModified = metadata[3]
                 previewBitmap = withContext(Dispatchers.IO) {
                     try {
                         val resolver = context.contentResolver
@@ -509,6 +548,26 @@ internal fun GalleryWorkspacePage(
                     )
                 } else {
                     Text(if (loading) "正在加载…" else "图片无法打开", color = Color.White)
+                }
+            }
+            IconButton(onClick = { showImageInfo = !showImageInfo },
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 14.dp)
+                    .size(44.dp).background(Color.Black.copy(alpha = 0.28f), CircleShape)) {
+                Icon(Icons.Rounded.Info, "图片信息", tint = Color.White, modifier = Modifier.size(27.dp))
+            }
+            if (showImageInfo) {
+                Column(
+                    Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                        .padding(start = 24.dp, end = 24.dp, top = 70.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color.Black.copy(alpha = 0.56f))
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(imageName, color = Color.White, fontSize = 16.sp, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text("$imageDimensions  $imageSize", color = Color.White.copy(alpha = 0.92f), fontSize = 16.sp)
+                    Text(imageModified, color = Color.White.copy(alpha = 0.92f), fontSize = 16.sp)
                 }
             }
         }
