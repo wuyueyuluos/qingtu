@@ -18,6 +18,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -100,6 +102,7 @@ private fun loadGalleryFolders(context: Context, sortMode: String, ascending: Bo
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun GalleryWorkspacePage(
     appearance: String,
@@ -145,9 +148,6 @@ internal fun GalleryWorkspacePage(
                     val parent = path.substringBeforeLast('/', "")
                     browsingPath = if (parent.isBlank()) "" else "$parent/"
                 }
-            }
-            selectionMode && selected.isNotEmpty() -> {
-                selected = emptySet()
             }
             selectionMode -> {
                 selectionMode = false
@@ -200,43 +200,45 @@ internal fun GalleryWorkspacePage(
                 Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text("轻图", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
-                    Text(if (currentPath == "全部文件夹") "全部图片 · $visibleCount 张" else currentPath + " · $visibleCount 张",
-                        color = Muted, fontSize = 12.sp, maxLines = 1)
-                }
-                Box {
-                    IconButton(onClick = { showSortMenu = true }) {
-                        Icon(Icons.Rounded.Tune, "排序方式", tint = DeepGreen, modifier = Modifier.size(25.dp))
+                if (selectionMode) {
+                    IconButton(onClick = { selectionMode = false; selected = emptySet() }) {
+                        Icon(Icons.Rounded.ArrowBack, "退出选择", tint = DeepGreen, modifier = Modifier.size(25.dp))
                     }
-                    DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text(if (sortMode == "name") "✓ 按名称排序" else "按名称排序") },
-                            onClick = { showSortMenu = false; updateSort(mode = "name") }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(if (sortMode == "date") "✓ 按日期排序" else "按日期排序") },
-                            onClick = { showSortMenu = false; updateSort(mode = "date") }
-                        )
-                        Divider()
-                        DropdownMenuItem(
-                            text = { Text(if (sortAscending) "✓ 升序" else "升序") },
-                            onClick = { showSortMenu = false; updateSort(ascending = true) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(if (!sortAscending) "✓ 降序" else "降序") },
-                            onClick = { showSortMenu = false; updateSort(ascending = false) }
-                        )
+                    Column(Modifier.weight(1f)) {
+                        Text("已选择 ${selected.size} 张", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text("点击图片可继续选择或取消", color = Muted, fontSize = 12.sp)
                     }
-                }
-                IconButton(onClick = { showHistory = true }) {
-                    Icon(Icons.Rounded.History, "处理记录", tint = DeepGreen, modifier = Modifier.size(25.dp))
-                }
-                IconButton(onClick = { showSettings = true }) {
-                    Icon(Icons.Rounded.Settings, "设置", tint = DeepGreen, modifier = Modifier.size(25.dp))
+                } else {
+                    Column(Modifier.weight(1f)) {
+                        Text("轻图", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                        Text(if (currentPath == "全部文件夹") "全部图片 · ${visibleCount} 张" else currentPath + " · ${visibleCount} 张",
+                            color = Muted, fontSize = 12.sp, maxLines = 1)
+                    }
+                    Box {
+                        IconButton(onClick = { showSortMenu = true }) {
+                            Icon(Icons.Rounded.Tune, "排序方式", tint = DeepGreen, modifier = Modifier.size(25.dp))
+                        }
+                        DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
+                            DropdownMenuItem(text = { Text(if (sortMode == "name") "✓ 按名称排序" else "按名称排序") },
+                                onClick = { showSortMenu = false; updateSort(mode = "name") })
+                            DropdownMenuItem(text = { Text(if (sortMode == "date") "✓ 按日期排序" else "按日期排序") },
+                                onClick = { showSortMenu = false; updateSort(mode = "date") })
+                            Divider()
+                            DropdownMenuItem(text = { Text(if (sortAscending) "✓ 升序" else "升序") },
+                                onClick = { showSortMenu = false; updateSort(ascending = true) })
+                            DropdownMenuItem(text = { Text(if (!sortAscending) "✓ 降序" else "降序") },
+                                onClick = { showSortMenu = false; updateSort(ascending = false) })
+                        }
+                    }
+                    IconButton(onClick = { showHistory = true }) {
+                        Icon(Icons.Rounded.History, "处理记录", tint = DeepGreen, modifier = Modifier.size(25.dp))
+                    }
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(Icons.Rounded.Settings, "设置", tint = DeepGreen, modifier = Modifier.size(25.dp))
+                    }
                 }
             }
-            if (selected.isNotEmpty() && !selectionMode) {
+            if (selectionMode && selected.isNotEmpty()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("压缩", "转换格式", "调整尺寸").forEach { label ->
                         FilledTonalButton(onClick = { operation = label }, modifier = Modifier.weight(1f)) { Text(label, fontSize = 12.sp) }
@@ -277,15 +279,25 @@ internal fun GalleryWorkspacePage(
                                     Box(
                                         Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(9.dp))
                                             .background(MaterialTheme.colorScheme.surfaceVariant)
-                                            .clickable {
-                                                if (selectionMode) selected = if (isSelected) selected - uri else selected + uri
-                                                else {
-                                                    previewImages = visibleFolders.flatMap { it.images }
-                                                    previewIndex = previewImages.indexOf(uri).coerceAtLeast(0)
-                                                    previewUri = uri
-                                                    previewBitmap = null
+                                            .combinedClickable(
+                                                onClick = {
+                                                    if (selectionMode) selected = if (isSelected) selected - uri else selected + uri
+                                                    else {
+                                                        previewImages = visibleFolders.flatMap { it.images }
+                                                        previewIndex = previewImages.indexOf(uri).coerceAtLeast(0)
+                                                        previewUri = uri
+                                                        previewBitmap = null
+                                                    }
+                                                },
+                                                onLongClick = {
+                                                    if (!selectionMode) {
+                                                        selectionMode = true
+                                                        selected = setOf(uri)
+                                                    } else {
+                                                        selected = if (isSelected) selected - uri else selected + uri
+                                                    }
                                                 }
-                                            }
+                                            )
                                     ) {
                                         if (thumb != null) Image(thumb!!.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                                         if (selectionMode && isSelected) {
@@ -314,17 +326,6 @@ internal fun GalleryWorkspacePage(
                     containerColor = DeepGreen, contentColor = Color.White) {
                     Icon(Icons.Rounded.Check, "选择图片")
                 }
-            }
-        }
-        if (selectionMode) {
-            FloatingActionButton(
-                onClick = { selectionMode = false },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 22.dp),
-                containerColor = DeepGreen, contentColor = Color.White
-            ) { Icon(Icons.Rounded.Check, "确定") }
-            TextButton(onClick = { selectionMode = false; selected = emptySet() },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 92.dp, bottom = 30.dp)) {
-                Text("取消", color = DeepGreen)
             }
         }
         if (pathMode) {
@@ -639,6 +640,7 @@ internal fun GalleryWorkspacePage(
                         status = summary
                         showStatus = true
                         selected = emptySet()
+                        selectionMode = false
                     }
                 }) { Text(if (busy) "处理中" else "开始处理") }
             },
