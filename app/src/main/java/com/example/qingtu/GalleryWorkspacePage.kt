@@ -200,7 +200,7 @@ internal fun GalleryWorkspacePage(
                             text = { Text(if (sortMode == "date") "✓ 按日期排序" else "按日期排序") },
                             onClick = { showSortMenu = false; updateSort(mode = "date") }
                         )
-                        HorizontalDivider()
+                        Divider()
                         DropdownMenuItem(
                             text = { Text(if (sortAscending) "✓ 升序" else "升序") },
                             onClick = { showSortMenu = false; updateSort(ascending = true) }
