@@ -322,10 +322,6 @@ internal fun GalleryWorkspacePage(
                 }, containerColor = SoftGreen, contentColor = DeepGreen) {
                     Icon(Icons.Rounded.FolderOpen, "选择路径")
                 }
-                FloatingActionButton(onClick = { selected = emptySet(); selectionMode = true },
-                    containerColor = DeepGreen, contentColor = Color.White) {
-                    Icon(Icons.Rounded.Check, "选择图片")
-                }
             }
         }
         if (pathMode) {
