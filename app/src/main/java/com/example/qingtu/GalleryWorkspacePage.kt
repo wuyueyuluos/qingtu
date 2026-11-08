@@ -64,10 +64,12 @@ import java.io.ByteArrayOutputStream
 
 private data class GalleryFolder(val path: String, val images: List<Uri>)
 
-private fun loadGalleryFolders(context: Context): List<GalleryFolder> {
+private fun loadGalleryFolders(context: Context, sortMode: String, ascending: Boolean): List<GalleryFolder> {
     val map = linkedMapOf<String, MutableList<Uri>>()
     val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.RELATIVE_PATH)
-    val sort = "${MediaStore.Images.Media.RELATIVE_PATH} ASC, ${MediaStore.Images.Media.DISPLAY_NAME} ASC"
+    val sortColumn = if (sortMode == "date") MediaStore.Images.Media.DATE_ADDED else MediaStore.Images.Media.DISPLAY_NAME
+    val direction = if (ascending) "ASC" else "DESC"
+    val sort = "${MediaStore.Images.Media.RELATIVE_PATH} ASC, $sortColumn $direction, ${MediaStore.Images.Media.DISPLAY_NAME} ASC"
     context.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null, sort)?.use { c ->
         val idCol = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
         val pathCol = c.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
@@ -88,6 +90,10 @@ internal fun GalleryWorkspacePage(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var folders by remember { mutableStateOf<List<GalleryFolder>>(emptyList()) }
+    val preferences = remember { context.getSharedPreferences("qingtu_settings", Context.MODE_PRIVATE) }
+    var sortMode by remember { mutableStateOf(preferences.getString("gallery_sort_mode", "name") ?: "name") }
+    var sortAscending by remember { mutableStateOf(preferences.getBoolean("gallery_sort_ascending", true)) }
+    var showSortMenu by remember { mutableStateOf(false) }
     var currentPath by remember {
         mutableStateOf(context.getSharedPreferences("qingtu_settings", Context.MODE_PRIVATE)
             .getString("batch_gallery_folder", "全部文件夹") ?: "全部文件夹")
@@ -144,7 +150,7 @@ internal fun GalleryWorkspacePage(
     val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
     fun refreshGallery() {
         scope.launch {
-            folders = withContext(Dispatchers.IO) { loadGalleryFolders(context) }
+            folders = withContext(Dispatchers.IO) { loadGalleryFolders(context, sortMode, sortAscending) }
         }
     }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -163,6 +169,13 @@ internal fun GalleryWorkspacePage(
     }
     val visibleCount = visibleFolders.sumOf { it.images.size }
 
+    fun updateSort(mode: String = sortMode, ascending: Boolean = sortAscending) {
+        sortMode = mode
+        sortAscending = ascending
+        preferences.edit().putString("gallery_sort_mode", mode).putBoolean("gallery_sort_ascending", ascending).apply()
+        refreshGallery()
+    }
+
     Box(Modifier.fillMaxSize().background(PageBg)) {
         Column(Modifier.fillMaxSize()) {
             Row(
@@ -173,6 +186,30 @@ internal fun GalleryWorkspacePage(
                     Text("轻图", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
                     Text(if (currentPath == "全部文件夹") "全部图片 · $visibleCount 张" else currentPath + " · $visibleCount 张",
                         color = Muted, fontSize = 12.sp, maxLines = 1)
+                }
+                Box {
+                    IconButton(onClick = { showSortMenu = true }) {
+                        Icon(Icons.Rounded.Tune, "排序方式", tint = DeepGreen, modifier = Modifier.size(25.dp))
+                    }
+                    DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(if (sortMode == "name") "✓ 按名称排序" else "按名称排序") },
+                            onClick = { showSortMenu = false; updateSort(mode = "name") }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (sortMode == "date") "✓ 按日期排序" else "按日期排序") },
+                            onClick = { showSortMenu = false; updateSort(mode = "date") }
+                        )
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text(if (sortAscending) "✓ 升序" else "升序") },
+                            onClick = { showSortMenu = false; updateSort(ascending = true) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (!sortAscending) "✓ 降序" else "降序") },
+                            onClick = { showSortMenu = false; updateSort(ascending = false) }
+                        )
+                    }
                 }
                 IconButton(onClick = { showHistory = true }) {
                     Icon(Icons.Rounded.History, "处理记录", tint = DeepGreen, modifier = Modifier.size(25.dp))
