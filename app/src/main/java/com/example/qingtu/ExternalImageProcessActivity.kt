@@ -225,7 +225,7 @@ private fun ExternalImageProcessDialog(uris: List<Uri>, onClose: () -> Unit) {
 
             if (busy) {
                 LinearProgressIndicator(
-                    progress = { if (sources.isEmpty()) 0f else progress.toFloat() / sources.size },
+                    progress = if (sources.isEmpty()) 0f else progress.toFloat() / sources.size,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
